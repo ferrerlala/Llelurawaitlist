@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Llelura — Fabric Season I</title>
+  <meta name="description" content="Llelura — Fabric Season I. Destination eveningwear. Join the waitlist." />
+  <!-- Google Font: Cormorant Garamond -->
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg: #2B1F1A;       /* dark espresso */
+      --text: #F5F0E8;     /* ivory */
+      --clay: #C9A38C;     /* warm clay */
+      --burnt: #C4714A;    /* burnt orange */
+      --max-width: 820px;
+      --radius: 6px;
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      font-family: "Cormorant Garamond", serif;
+      background:var(--bg);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      line-height:1.4;
+    }
+
+    .wrap{
+      min-height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:48px 20px;
+    }
+
+    .card{
+      width:100%;
+      max-width:var(--max-width);
+      display:grid;
+      gap:32px;
+      grid-template-columns: 1fr 360px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
+      padding:48px;
+      border-radius:12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      align-items:start;
+    }
+
+    /* Left content */
+    .brand{
+      letter-spacing:2px;
+      color:var(--clay);
+      font-weight:400;
+      font-size:14px;
+      text-transform:uppercase;
+      margin-bottom:8px;
+    }
+
+    h1{
+      margin:0 0 12px 0;
+      font-size:28px;
+      font-weight:700;
+      color:var(--text);
+      line-height:1.06;
+    }
+
+    p.lead{
+      margin:0;
+      color:rgba(245,240,232,0.9);
+      font-size:16px;
+      max-width:56ch;
+    }
+
+    /* Right: form */
+    .signup{
+      background: linear-gradient(180deg, rgba(201,163,140,0.04), rgba(196,113,74,0.02));
+      padding:20px;
+      border-radius:8px;
+      border:1px solid rgba(245,240,232,0.03);
+    }
+
+    label{
+      display:block;
+      font-size:13px;
+      margin-bottom:6px;
+      color:var(--text);
+      opacity:0.9;
+    }
+
+    .field{
+      margin-bottom:14px;
+    }
+
+    input[type="email"],
+    input[type="text"]{
+      width:100%;
+      padding:12px 14px;
+      font-size:15px;
+      border-radius:6px;
+      border:none;
+      background:rgba(255,255,255,0.02);
+      color:var(--text);
+      outline:2px solid transparent;
+      transition: outline-color .15s ease;
+    }
+
+    input:focus{
+      outline-color: rgba(196,113,74,0.35);
+    }
+
+    .btn{
+      display:inline-block;
+      width:100%;
+      padding:12px 14px;
+      text-align:center;
+      background: linear-gradient(90deg,var(--clay),var(--burnt));
+      color:var(--bg);
+      border-radius:8px;
+      border:none;
+      font-weight:600;
+      font-size:15px;
+      cursor:pointer;
+      letter-spacing:0.6px;
+      transition: transform .08s ease, box-shadow .12s ease;
+    }
+
+    .btn:active{ transform: translateY(1px); }
+
+    .muted{
+      display:block;
+      text-align:center;
+      margin-top:10px;
+      font-size:13px;
+      color:rgba(245,240,232,0.8);
+      opacity:0.9;
+    }
+
+    .footer{
+      grid-column: 1 / -1;
+      text-align:center;
+      font-size:13px;
+      color:rgba(245,240,232,0.85);
+      letter-spacing:1px;
+      margin-top:6px;
+    }
+
+    .confirmation{
+      display:none;
+      background: rgba(196,113,74,0.05);
+      padding:12px 14px;
+      border-radius:8px;
+      border:1px solid rgba(196,113,74,0.06);
+      color:var(--text);
+      font-size:15px;
+    }
+
+    .form-row{
+      display:flex;
+      gap:10px;
+    }
+
+    @media (max-width:880px){
+      .card{
+        grid-template-columns: 1fr;
+        padding:36px 20px;
+        gap:20px;
+      }
+      .signup{ order:2; }
+    }
+
+    @media (max-width:420px){
+      h1{ font-size:22px; }
+      .brand{ font-size:12px; letter-spacing:1.5px; }
+    }
+
+    /* subtle decorative underline */
+    .underline{
+      height:2px;
+      width:64px;
+      background: linear-gradient(90deg,var(--clay),var(--burnt));
+      border-radius:2px;
+      margin:10px 0 16px 0;
+    }
+
+    /* small accessibility helper */
+    .visually-hidden{
+      position:absolute!important;
+      height:1px;width:1px;
+      overflow:hidden;
+      clip:rect(1px,1px,1px,1px);
+      white-space:nowrap;
+    }
+
+  </style>
+</head>
+<body>
+  <main class="wrap" role="main">
+    <section class="card" aria-labelledby="main-heading">
+      <div class="left">
+        <div class="brand">Llelura</div>
+        <div class="underline" aria-hidden="true"></div>
+        <h1 id="main-heading">Nothing about her looks like effort.<br>Neither does this.</h1>
+        <p class="lead">Fabric Season I is coming — one considered silhouette, three ways to wear it. Be the first to know when it's ready.</p>
+      </div>
+
+      <aside class="signup" aria-label="Join the waitlist">
+        <form id="waitlist-form" method="POST" action="https://formspree.io/f/your-form-id" novalidate>
+          <!-- Replace the action above with your Formspree (or other provider) form endpoint -->
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" required inputmode="email" placeholder="you@example.com" autocomplete="email" />
+          </div>
+
+          <div class="field">
+            <label for="firstName">First name <small style="opacity:.8;font-weight:400">(optional)</small></label>
+            <input id="firstName" name="firstName" type="text" placeholder="First name" autocomplete="given-name" />
+          </div>
+
+          <!-- Optional: a hidden field to identify the source -->
+          <input type="hidden" name="_subject" value="Llelura Waitlist Signup" />
+          <input type="hidden" name="source" value="llelura-github-pages" />
+
+          <button class="btn" id="submitBtn" type="submit">Join the List</button>
+
+          <div style="height:12px"></div>
+
+          <div id="response" aria-live="polite" class="confirmation">You're on the list. We'll be in touch when it's ready.</div>
+
+          <p class="muted" style="margin-top:12px; font-size:13px;">We respect your privacy. You can contact <a href="mailto:info@lleura.com" style="color:var(--text); text-decoration:underline; opacity:.9;">info@lleura.com</a></p>
+        </form>
+      </aside>
+
+      <div class="footer" aria-hidden="true">Destination Eveningwear</div>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      const form = document.getElementById('waitlist-form');
+      const responseBox = document.getElementById('response');
+      const submitBtn = document.getElementById('submitBtn');
+
+      // A simple function to show messages
+      function showMessage(text, isError){
+        responseBox.textContent = text;
+        responseBox.style.display = 'block';
+        responseBox.style.color = isError ? '#ffdbda' : 'var(--text)';
+        if(!isError){
+          responseBox.style.background = 'rgba(196,113,74,0.05)';
+        } else {
+          responseBox.style.background = 'rgba(200,50,50,0.04)';
+        }
+      }
+
+      form.addEventListener('submit', function(e){
+        e.preventDefault();
+        responseBox.style.display = 'none';
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending…';
+
+        const formData = new FormData(form);
+        const action = (form.getAttribute('action') || '').trim();
+
+        // If no custom endpoint, show guidance (still do nothing)
+        if(!action || action.includes('your-form-id')){
+          setTimeout(() => {
+            showMessage("You're on the list. We'll be in touch when it's ready.");
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Join the List';
+          }, 700);
+          return;
+        }
+
+        // Send using fetch to JSON endpoint (Formspree supports this)
+        // Convert FormData to JSON
+        const data = {};
+        formData.forEach((value, key) => (data[key] = value));
+
+        fetch(action, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        })
+        .then(async res => {
+          if (res.ok) {
+            showMessage("You're on the list. We'll be in touch when it's ready.");
+            form.reset();
+          } else {
+            // try to extract error message from JSON
+            let errtext = 'There was a problem. Please try again.';
+            try {
+              const json = await res.json();
+              if (json && json.error) errtext = json.error;
+            } catch(e){}
+            showMessage(errtext, true);
+          }
+        })
+        .catch(() => {
+          showMessage('Network error. Please try again later.', true);
+        })
+        .finally(() => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Join the List';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
