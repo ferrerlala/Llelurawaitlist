@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { IconArrow, IconLayers, IconPlus } from "@/components/Icons";
+import { mergeFounderPortfolio, SAMPLE_COMPANY_NAMES } from "@/lib/founder-portfolio";
 import { useStore } from "@/lib/store";
 import { cx, formatDate } from "@/lib/util";
 
@@ -25,7 +26,7 @@ export default function PortfolioPage() {
 
 function Portfolio() {
   const params = useSearchParams();
-  const { hydrated, workspace, company, setActive, createCompany, runPortfolio, portfolioTask } = useStore();
+  const { hydrated, workspace, company, setActive, createCompany, runPortfolio, portfolioTask, replaceWorkspace } = useStore();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [oneLiner, setOneLiner] = useState("");
@@ -49,6 +50,18 @@ function Portfolio() {
           <p className="subtitle">I look for what your companies share and what should be built once.</p>
         </div>
         <div className="row gap-8">
+          {!workspace.companies.some((c) => c.name === "HAOI") && (
+            <button
+              className="btn"
+              onClick={() => {
+                const hasSample = workspace.companies.some((c) => SAMPLE_COMPANY_NAMES.includes(c.name));
+                const drop = hasSample && confirm("Remove the fictional sample companies while loading yours?");
+                replaceWorkspace(mergeFounderPortfolio(workspace, drop));
+              }}
+            >
+              Load my companies
+            </button>
+          )}
           <button className="btn" onClick={() => setAdding(true)}>
             <IconPlus /> Add company
           </button>
@@ -116,7 +129,11 @@ function Portfolio() {
             <div className="small muted mt-8">{c.profile.oneLiner || "No description yet."}</div>
             <div className="row gap-8 wrap mt-16">
               {c.profile.industry && <span className="chip">{c.profile.industry}</span>}
-              {c.profile.stage && <span className="chip">{c.profile.stage}</span>}
+              {c.profile.stage && (
+                <span className="chip" style={{ whiteSpace: "normal", maxWidth: "100%" }}>
+                  {c.profile.stage}
+                </span>
+              )}
               {c.id === company?.id && <span className="badge accent">Active</span>}
             </div>
           </button>

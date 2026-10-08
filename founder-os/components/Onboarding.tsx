@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { mergeFounderPortfolio } from "@/lib/founder-portfolio";
 import { sampleWorkspace } from "@/lib/sample";
 import { useStore } from "@/lib/store";
 import { IconArrow } from "./Icons";
 
 export function Onboarding() {
-  const { createCompany, replaceWorkspace } = useStore();
+  const { createCompany, replaceWorkspace, workspace } = useStore();
   const [name, setName] = useState("");
   const [oneLiner, setOneLiner] = useState("");
   const [industry, setIndustry] = useState("");
@@ -21,15 +22,31 @@ export function Onboarding() {
         the highest-leverage decision.
       </p>
 
+      <div className="answer-block mt-32 row between wrap gap-16">
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <div className="eyebrow">Your portfolio</div>
+          <div className="serif" style={{ fontSize: 24, marginTop: 6 }}>
+            HAOI · Cumpliva · Elleah Health · Banlu
+          </div>
+          <div className="small muted mt-8">
+            Load your four companies with what their prototypes already say, plus an initial brief for each and a
+            portfolio analysis.
+          </div>
+        </div>
+        <button className="btn primary" onClick={() => replaceWorkspace(mergeFounderPortfolio(workspace))}>
+          Load my companies
+        </button>
+      </div>
+
       <form
-        className="card mt-32"
+        className="card mt-24"
         style={{ padding: 28 }}
         onSubmit={(e) => {
           e.preventDefault();
           if (name.trim()) createCompany(name.trim(), { oneLiner, industry, stage });
         }}
       >
-        <div className="eyebrow">Start with your company</div>
+        <div className="eyebrow">Or start with another company</div>
         <div className="grid g2 mt-16">
           <div>
             <label className="label" htmlFor="ob-name">
