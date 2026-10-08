@@ -211,19 +211,21 @@ const briefs: Record<string, Brief> = {
     },
     health: "FRAGILE",
     health_note: "A strong product shape without a customer conversation on record.",
-    current_priority: "Put the prototype in front of three MA agency owners and ask them to pay for a pilot.",
+    current_priority: "Get written conflict-of-interest clearance before showing Cumpliva to any agency.",
     biggest_opportunity: "Become the system of record between agencies and ASAPs as the new licensing law raises the cost of sloppy compliance.",
-    biggest_risk: "Agencies treat it as 'nice to have' next to their EVV vendor, or an EVV vendor adds reconciliation.",
-    current_bottleneck: "No pricing and no pilot customer.",
+    biggest_risk:
+      "Your employer's conflict-of-interest policy: agencies that contract with your ASAP are its vendors, and you may make referral or complaint decisions about them.",
+    current_bottleneck: "Employer clearance, then pricing and a pilot customer.",
     top_3_actions: [
-      "Define a pilot price (per agency per month) and a 60-day success metric.",
-      "Book three agency-owner demos from your ASAP network.",
-      "Run one agency's real EVV and timesheet export through reconciliation.",
+      "Send the written conflict-of-interest disclosure to your supervisor and HR.",
+      "Define a pilot price (per agency per month) and a 60-day success metric, without contacting agencies yet.",
+      "Once cleared, demo only to agencies outside your employer's network and service area.",
     ],
     radar: [
       { category: "Market Changes", signal: "MA home care licensing law signed 08/07/2026: inspections and complaint investigations", urgency: "now" },
       { category: "Opportunities", signal: "Pre-invoice reconciliation recovers money agencies would otherwise lose or repay", urgency: "now" },
-      { category: "Bottlenecks", signal: "No pricing or pilot terms defined", urgency: "now" },
+      { category: "Risks", signal: "Selling to your employer's contracted agencies is a likely conflict of interest", urgency: "now" },
+      { category: "Bottlenecks", signal: "No pricing or pilot terms defined", urgency: "soon" },
       { category: "Competitive Moves", signal: "EVV vendors could add reconciliation features", urgency: "soon" },
       { category: "Moats", signal: "ASAP portal links agencies and care managers on one record", urgency: "soon" },
     ],
@@ -256,9 +258,9 @@ const briefs: Record<string, Brief> = {
     biggest_risk: "Three doors and a day job leave no door finished.",
     current_bottleneck: "Founder time.",
     top_3_actions: [
-      "Pick the one advisory offer you can sell this month and pitch it to five contacts.",
-      "Recruit 10 families for a free Pocket beta and measure follow-up questions.",
-      "Confirm in writing that your employer agreement permits this work.",
+      "Include Elleah in your conflict-of-interest disclosure and ask specifically about advisory and family consults.",
+      "Pick one investor-side advisory offer (lowest conflict) and pitch it to five contacts outside your employer's network.",
+      "Exclude your employer's consumers and their families from any family beta.",
     ],
     radar: [
       { category: "Opportunities", signal: "Advisory is the fastest path to first revenue", urgency: "now" },
@@ -328,18 +330,18 @@ const briefs: Record<string, Brief> = {
     },
     health: "FRAGILE",
     health_note: "Strong architecture, no customer pull yet. The risk is building breadth before depth.",
-    current_priority: "Freeze platform breadth; get one product to a paying pilot on top of HAOI.",
+    current_priority: "Send your conflict-of-interest disclosure, then freeze platform breadth and take one product to a cleared pilot.",
     biggest_opportunity: "Own the coordination record between Massachusetts ASAPs and home care agencies, then extend it.",
-    biggest_risk: "Four products, one founder, zero customers.",
+    biggest_risk: "Selling into your employer's vendor network before written clearance, with four products, one founder and no customers.",
     current_bottleneck: "Focus: every hour is split across four surfaces.",
     top_3_actions: [
-      "Choose Cumpliva as the lead product for the next 90 days.",
+      "Send the written conflict-of-interest disclosure to your supervisor and HR this week.",
+      "While you wait: do low-conflict work only (Elleah investor advisory, Banlu validation, HAOI build).",
       "Keep HAOI internal: no platform sales until two products have paying users.",
-      "Confirm your employment agreement allows building and selling in this market.",
     ],
     radar: [
       { category: "Bottlenecks", signal: "Founder attention split across four products", urgency: "now" },
-      { category: "Risks", signal: "Possible employer IP / conflict-of-interest exposure", urgency: "now" },
+      { category: "Risks", signal: "Employer conflict-of-interest policy requires disclosure before any sales", urgency: "now" },
       { category: "Market Changes", signal: "MA home care licensing law raises compliance stakes", urgency: "now" },
       { category: "Moats", signal: "Shared evidence and audit trail across products", urgency: "soon" },
       { category: "Opportunities", signal: "ASAP ↔ agency network effect in Massachusetts", urgency: "soon" },
@@ -398,14 +400,14 @@ const portfolio: Portfolio = {
       "Evidence, verification & audit trail",
       "Human-approved AI & usage metering",
     ],
-    products_on_top: ["Cumpliva (agencies) · lead", "Elleah Health (case managers & families)", "Banlu (logistics adapter) · paused"],
+    products_on_top: ["Cumpliva (agencies) · build now, sell once cleared", "Elleah Health (case managers & families)", "Banlu (logistics adapter) · paused"],
   },
   focus_call:
-    "Cumpliva. It has the clearest buyer (the agency owner), money on the line (pre-invoice reconciliation), and a regulatory reason to act now. Elleah advisory runs in parallel only as income; Banlu pauses after documenting what the relay test proved.",
+    "First, your disclosure: nothing is sold until your employer clears it in writing. Cumpliva remains the strongest business (clear buyer, money on the line, a regulatory reason to act), but it carries the most conflict risk, so build it now and sell it only once cleared, outside your employer's network. Elleah investor advisory is the lowest-conflict path to first income meanwhile.",
   next_3_moves: [
-    "Set a Cumpliva pilot price and book three agency-owner demos within two weeks.",
-    "Move Cumpliva's data onto HAOI's identity, case and evidence core so it's built once.",
-    "Get written confirmation that your employment agreement allows this work before any pilot.",
+    "Send the written conflict-of-interest disclosure to your supervisor and HR this week.",
+    "Move Cumpliva onto HAOI's identity, case and evidence core and set its pilot price, without contacting agencies.",
+    "Pitch one investor-side Elleah advisory offer to contacts outside your employer's network.",
   ],
 };
 
@@ -431,19 +433,28 @@ export function founderPortfolio(): { companies: Company[]; portfolio: Workspace
 export const SAMPLE_COMPANY_NAMES = ["Tandem Care", "Clearclaim", "Shiftwise"];
 
 /**
- * Add the portfolio to a workspace, skipping companies that already exist by name.
- * `dropSample` removes the fictional sample companies first.
+ * Add the portfolio to a workspace. Companies that already exist by name keep
+ * everything the founder entered; only their brief is refreshed and any new
+ * recommended actions are added. `dropSample` removes the fictional sample first.
  */
 export function mergeFounderPortfolio(base: Workspace, dropSample = false): Workspace {
   const w = dropSample ? { ...base, companies: base.companies.filter((c) => !SAMPLE_COMPANY_NAMES.includes(c.name)) } : base;
   const { companies, portfolio: p } = founderPortfolio();
+  const byName = new Map(companies.map((c) => [c.name.toLowerCase(), c]));
+  const updated = w.companies.map((c) => {
+    const next = byName.get(c.name.toLowerCase());
+    if (!next?.brief) return c;
+    const known = new Set(c.actions.map((a) => a.text.toLowerCase()));
+    return {
+      ...c,
+      brief: next.brief,
+      readinessHistory: [...c.readinessHistory, ...next.readinessHistory].slice(-24),
+      actions: [...next.actions.filter((a) => !known.has(a.text.toLowerCase())), ...c.actions],
+    };
+  });
   const existing = new Set(w.companies.map((c) => c.name.toLowerCase()));
   const fresh = companies.filter((c) => !existing.has(c.name.toLowerCase()));
-  const lead = [...w.companies, ...fresh].find((c) => c.name === "Cumpliva");
-  return {
-    ...w,
-    companies: [...w.companies, ...fresh],
-    activeCompanyId: lead?.id ?? w.activeCompanyId,
-    portfolio: p,
-  };
+  const all = [...updated, ...fresh];
+  const lead = all.find((c) => c.name === "HAOI");
+  return { ...w, companies: all, activeCompanyId: lead?.id ?? w.activeCompanyId, portfolio: p };
 }

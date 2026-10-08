@@ -50,7 +50,7 @@ function Portfolio() {
           <p className="subtitle">I look for what your companies share and what should be built once.</p>
         </div>
         <div className="row gap-8">
-          {!workspace.companies.some((c) => c.name === "HAOI") && (
+          {(
             <button
               className="btn"
               onClick={() => {
@@ -59,7 +59,7 @@ function Portfolio() {
                 replaceWorkspace(mergeFounderPortfolio(workspace, drop));
               }}
             >
-              Load my companies
+              {workspace.companies.some((c) => c.name === "HAOI") ? "Refresh my companies" : "Load my companies"}
             </button>
           )}
           <button className="btn" onClick={() => setAdding(true)}>
