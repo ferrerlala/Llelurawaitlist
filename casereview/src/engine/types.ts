@@ -39,10 +39,36 @@ export interface ReviewInput {
 // ---------- CDS preparation ----------
 export type CdsStatus = 'Ready for Review' | 'Needs Verification' | 'Not Documented' | 'Unable to Determine';
 
+/**
+ * Maps narrative facts to answer choices. All fields are optional filters; a rule applies to a
+ * fact when every given filter matches. choices are answer codes ("0", "1-C") or choice text
+ * prefixes ("Not completed"). Several choices = candidates for the case manager to select from.
+ */
+export interface AnswerRule {
+  factKey?: string;
+  /** Case-insensitive regular expression tested against the fact value. */
+  valueMatches?: string;
+  assertion?: Assertion;
+  choices?: string[];
+  /** For text questions: the suggested text (defaults to the fact value). */
+  text?: string;
+  /** Use this capture group of valueMatches as the answer code. */
+  captureChoice?: number;
+  verify?: boolean;
+  note?: string;
+}
+
+export type CdsQuestionType = 'single' | 'multi' | 'date' | 'text';
+
 export interface CdsFieldDef {
   id: string;
   section: string;
   label: string;
+  /** Instrument item code, e.g. "H.2 j." */
+  code?: string;
+  group?: string;
+  type?: CdsQuestionType;
+  answerRules?: AnswerRule[];
   /** Answer choices if the configured instrument defines them. Empty = free text. */
   choices: string[];
   /** Fact keys that can support this field (first match wins, all are shown as evidence). */
@@ -66,6 +92,15 @@ export interface CdsResponse {
   fieldId: string;
   section: string;
   label: string;
+  code: string;
+  group: string;
+  type: CdsQuestionType;
+  choices: string[];
+  /** Candidate answer choices when the narrative supports more than one. */
+  candidates: string[];
+  /** The field has a narrative mapping (otherwise it must be completed from the assessment). */
+  mapped: boolean;
+  functional: boolean;
   suggestedResponse: string;
   evidence: EvidenceRef[];
   confidence: Confidence | 'n/a';

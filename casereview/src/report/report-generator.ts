@@ -53,7 +53,9 @@ export function generateReportHtml(review: ReviewRecord, opts: { title?: string 
           .join('')}</table>`
       : '<p class="muted">Nothing documented.</p>';
 
-  const sections = [...new Set(a.cds.map((c) => c.section))];
+  const prepared = a.cds.filter((c) => c.mapped !== false);
+  const unprepared = a.cds.length - prepared.length;
+  const sections = [...new Set(prepared.map((c) => c.section))];
   const missing = a.qa.filter((q) => q.status === 'Missing' || q.status === 'Unable to Verify');
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(opts.title ?? `Case Review Report – ${i.caseIdentifier}`)}</title><style>${CSS}</style></head><body>
@@ -76,11 +78,11 @@ export function generateReportHtml(review: ReviewRecord, opts: { title?: string 
     .join('')}</table>
 
 <h2 class="pb">5. CDS preparation responses (WellSky Transfer Guide)</h2>
-<p class="muted">Enter only human-verified responses into WellSky. "Not documented" must not be entered as "No".</p>
+<p class="muted">Enter only human-verified responses into WellSky. "Not documented" must not be entered as "No" or "Not present". Where several codes are listed, the narrative does not state the level — select the verified code.${unprepared ? ` ${unprepared} other instrument question(s) are not prepared from the narrative and must be completed from the assessment.` : ''}</p>
 ${sections
-    .map((s) => `<h3>${esc(s)}</h3><table><tr><th>Field</th><th>Response</th><th>Status</th><th>Verification</th><th>Supporting narrative</th></tr>${a.cds
+    .map((s) => `<h3>${esc(s)}</h3><table><tr><th>Question</th><th>Response</th><th>Status</th><th>Verification</th><th>Supporting narrative</th></tr>${prepared
       .filter((c) => c.section === s)
-      .map((c) => { const f = finalValue(review, c); return `<tr><td>${esc(c.label)}</td><td>${esc(f.v)}</td><td>${badge(c.status)}</td><td>${esc(f.s)}</td><td class="q">${c.evidence[0] ? `“${esc(c.evidence[0].text)}”` : '<span class="muted">None</span>'}</td></tr>`; })
+      .map((c) => { const f = finalValue(review, c); return `<tr><td>${c.code ? `<b>${esc(c.code)}</b> ` : ''}${esc(c.label)}</td><td>${esc(f.v)}</td><td>${badge(c.status)}</td><td>${esc(f.s)}</td><td class="q">${c.evidence[0] ? `“${esc(c.evidence[0].text)}”` : '<span class="muted">None</span>'}</td></tr>`; })
       .join('')}</table>`)
     .join('')}
 

@@ -27,8 +27,11 @@ export function parseCdsRecords(docs: SourceDocument[]): CdsRecordEntry[] | null
 export function normalizeCdsFunctional(value: string): CdsFunctionalStatus {
   const v = value.toLowerCase().trim();
   if (/^(n\/?a|not applicable)\b/.test(v)) return 'Not Applicable';
-  if (/\bdependent\b|total(ly)? (assist|dependent)|^total\b/.test(v) && !/\bindependent\b/.test(v)) return 'Dependent';
-  if (/\b(assist|assistance|help|supervision|cue|cueing|limited|extensive|needs|requires|set ?up)\b/.test(v)) return 'Needs Assistance';
+  if (/did not occur/.test(v)) return 'Other';
+  if ((/\bdependen(t|ce)\b|total(ly)? (assist|dependent)|^total\b|\bby others\b/.test(v)) && !/\bindependent\b/.test(v)) return 'Dependent';
+  // Check independence first: CDS code 0 reads "INDEPENDENT-No help, setup or oversight".
+  if (/\bindependent\b/.test(v) && !/\bnot independent\b/.test(v)) return 'Independent';
+  if (/\b(assist|assistance|help|supervision|oversight|cue|cueing|limited|extensive|maximal|needs|requires|set ?up)\b/.test(v)) return 'Needs Assistance';
   if (/\b(independent|indep|no assistance|self)\b/.test(v) || /^i$/.test(v)) return 'Independent';
   if (!v || /^(blank|not answered|unknown|-)$/.test(v)) return 'Not Recorded';
   return 'Other';

@@ -83,7 +83,7 @@ export function setWorkflowStatus(user: AppUser, review: ReviewRecord, status: R
 /** Reviewed-item progress for display. */
 export function reviewProgress(review: ReviewRecord) {
   const totals = {
-    cds: review.analysis.cds.length,
+    cds: review.analysis.cds.filter((c) => c.mapped !== false).length,
     adl: review.analysis.adl.length,
     qa: review.analysis.qa.length,
     issue: review.analysis.issues.length,
@@ -91,6 +91,10 @@ export function reviewProgress(review: ReviewRecord) {
   const done = { cds: 0, adl: 0, qa: 0, issue: 0 };
   for (const k of Object.keys(review.decisions)) {
     const kind = k.split(':')[0] as keyof typeof done;
+    if (kind === 'cds') {
+      const c = review.analysis.cds.find((x) => `cds:${x.fieldId}` === k);
+      if (c && c.mapped === false) continue;
+    }
     if (kind in done) done[kind]++;
   }
   const total = totals.cds + totals.adl + totals.qa + totals.issue;

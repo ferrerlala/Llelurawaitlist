@@ -25,7 +25,8 @@ function expandSlashPairs(text: string): string {
 }
 
 export function findAreas(segment: string, areas: FunctionalAreaDef[]): FunctionalAreaDef[] {
-  const text = expandSlashPairs(segment.toLowerCase());
+  // "Heavy housework" is a separate CDS item from ordinary housework/housekeeping.
+  const text = expandSlashPairs(segment.toLowerCase()).replace(/heavy (house)?work/g, 'heavy-chores');
   return areas.filter((a) => a.synonyms.some((s) => new RegExp(`(^|[^a-z])${escapeRe(s)}([^a-z]|$)`).test(text)));
 }
 

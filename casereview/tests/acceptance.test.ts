@@ -60,16 +60,18 @@ describe('TEST 2 – documented independent ADLs/IADLs only', () => {
     for (const id of independent) expect(adl(id).narrativeStatus, id).toBe('Independent');
   });
   it('does not assume undocumented activities are independent', () => {
-    for (const id of ['bathing', 'dressing', 'housekeeping', 'laundry', 'transfers', 'outdoor_mobility']) {
-      expect(adl(id).narrativeStatus, id).toBe('Not Documented');
-      expect(cds(`fn_${id}`).status).toBe('Not Documented');
-      expect(cds(`fn_${id}`).suggestedResponse).not.toMatch(/independent|no\b/i);
+    for (const id of ['bathing', 'dressing', 'housekeeping', 'laundry', 'transfers', 'outdoor_mobility']) expect(adl(id).narrativeStatus, id).toBe('Not Documented');
+    for (const id of ['H2_bathing', 'H2_dressing_upper', 'H2_dressing_lower', 'H1_ordinary_housework', 'H1_laundry_who', 'H2_transfer', 'H2_locomotion_outside']) {
+      expect(cds(id).status, id).toBe('Not Documented');
+      expect(cds(id).suggestedResponse, id).toBe('Not documented');
     }
   });
   it('flags meal preparation, shopping and transportation as needing verification', () => {
     expect(adl('meal_preparation').narrativeStatus).toBe('Assistance Provided');
     expect(adl('shopping').narrativeStatus).toBe('Mentioned - Level Not Stated');
-    for (const id of ['meal_preparation', 'shopping', 'transportation']) expect(cds(`fn_${id}`).status).toBe('Needs Verification');
+    for (const id of ['H1_meal_preparation', 'H1_shopping', 'H1_transportation']) expect(cds(id).status, id).toBe('Needs Verification');
+    // Assistance without a stated level is never turned into a single code.
+    expect(cds('H1_meal_preparation').candidates).toEqual(['1 - SOME HELP-help some of the time', '2 - FULL HELP-performed with help all of the time', '3 - BY OTHERS-performed by others']);
   });
 });
 
@@ -78,8 +80,9 @@ describe('TEST 3 – declined Mini-Cog', () => {
     const f = sample.facts.find((x) => x.key === 'medical.memory_screening')!;
     expect(f.assertion).toBe('declined');
     expect(f.value).toMatch(/not completed/i);
-    expect(cds('cog_screen').suggestedResponse).toMatch(/declined/i);
-    expect(cds('cog_screen').suggestedResponse).not.toMatch(/^completed/i);
+    expect(cds('B_mls_score').suggestedResponse).toBe('Not completed');
+    expect(cds('B_mls_reason').candidates).toEqual(['Refused (dementia is suspected)', 'Refused (dementia not suspected)']);
+    expect(cds('B_mls_reason').status).toBe('Needs Verification');
   });
 });
 
@@ -160,7 +163,8 @@ describe('TEST 9 – 17 QA categories', () => {
     expect(sample.qa).toHaveLength(17);
     expect(sample.qa.map((q) => q.number)).toEqual(Array.from({ length: 17 }, (_, i) => i + 1));
     expect(sample.finalStatus).not.toMatch(/pass/i);
-    expect(sample.finalStatus).toBe('Additional Documentation Required');
+    // FIL 1C requires 4+ ADL deficits; the narrative documents none and leaves only 3 ADLs undocumented.
+    expect(sample.finalStatus).toBe('Corrections Required');
   });
   it('differentiates narrative evidence from information requiring another record', () => {
     expect(qa('financial_consent').status).toBe('Missing'); // worksheet not documented
@@ -171,17 +175,21 @@ describe('TEST 9 – 17 QA categories', () => {
     expect(qa('fall_risk').recommendedCorrection).toMatch(/K5/);
     expect(qa('narrative_cds').status).toBe('Unable to Verify');
     expect(qa('narrative_cds').evidenceMissing.join(' ')).toMatch(/cannot be declared complete/);
-    expect(qa('fil').status).toBe('Unable to Verify');
+    expect(qa('fil').status).toBe('Mismatch');
+    expect(qa('fil').recommendedCorrection).toMatch(/requires 4 or more ADLs.*0 ADL deficit\(s\) \(at most 3/);
     expect(qa('contact_info').status).toBe('Unable to Verify');
     expect(qa('copay').status).toBe('Unable to Verify');
     for (const q of sample.qa) expect(q.status, q.title).not.toBe('Complete');
   });
-  it('labels the CDS as provisional and never converts missing data to "No"', () => {
-    expect(sample.cds.every((c) => c.provisional)).toBe(true);
+  it('uses the CDS-3-CM instrument and never converts missing data to "No"', () => {
     for (const c of sample.cds.filter((x) => x.status === 'Not Documented')) expect(c.suggestedResponse).toBe('Not documented');
     expect(cds('demo_living').status).toBe('Not Documented'); // "single" must not imply "lives alone"
-    expect(cds('health_falls').suggestedResponse).toMatch(/No recent falls reported/);
-    expect(cds('health_falls').status).toBe('Needs Verification');
+    expect(cds('K5_falls_6mo').suggestedResponse).toBe('0 - No');
+    expect(cds('K5_falls_6mo').status).toBe('Needs Verification');
+    // Diagnoses not mentioned are Not Documented, never "0 - Not present".
+    expect(cds('J_hypertension').candidates[0]).toMatch(/^1 - Present/);
+    expect(cds('J_chf').status).toBe('Not Documented');
+    expect(cds('BB_caregiver').status).toBe('Not Documented'); // emotional support is not an identified caregiver
   });
 });
 
@@ -209,6 +217,6 @@ describe('Safeguards', () => {
   it('flags conflicting statements in the narrative instead of resolving them', () => {
     const r = analyze([doc('x', 'Independent with bathing.\nRequires assistance with bathing.')]);
     expect(r.adl.find((a) => a.areaId === 'bathing')!.narrativeStatus).toBe('Conflicting');
-    expect(r.cds.find((c) => c.fieldId === 'fn_bathing')!.status).toBe('Unable to Determine');
+    expect(r.cds.find((c) => c.fieldId === 'H2_bathing')!.status).toBe('Unable to Determine');
   });
 });

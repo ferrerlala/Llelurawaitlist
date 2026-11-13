@@ -157,7 +157,7 @@ export function buildCorrectionReport(args: {
   }
 
   // CDS fields not documented (non-functional).
-  const notDoc = args.cds.filter((c) => c.status === 'Not Documented' && !c.fieldId.startsWith('fn_'));
+  const notDoc = args.cds.filter((c) => c.status === 'Not Documented' && c.mapped && !c.functional && c.type === 'text');
   if (notDoc.length) {
     push({
       priority: 'Medium',

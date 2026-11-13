@@ -17,7 +17,7 @@ The case manager approves, edits or rejects every suggestion. Every change is re
 > **Important**
 > - This product is **not affiliated with, endorsed by, or integrated with AgeSpan or WellSky.**
 > - AI output is a preparation aid. The tool **never** labels a file "QA Passed", never certifies eligibility, and never presents AI responses as final assessments.
-> - The CDS field mapping included here is **provisional**. It is not the official Massachusetts CDS instrument. Configure the approved instrument before production use.
+> - CDS questions and answer choices come from the CDS-3-CM v3.3.2 form export. Which narrative statements support which answers is this tool's suggestion and must be verified. Items outside CDS-3-CM ("Other WellSky records") use a provisional mapping.
 > - Use **fictional data only** until all of the [requirements for real consumer data](#security-and-production-deployment-requirements) are met.
 
 ---
@@ -204,11 +204,32 @@ The parser treats field labels as labels, not values. A label with nothing after
 
 Final status for the sample alone: **Additional Documentation Required**. With the conflicting CDS excerpt or financial worksheet added, it becomes **Corrections Required**.
 
+## CDS instrument (CDS-3-CM v3.3.2)
+
+The default CDS template is built from the **CDS-3-CM – Case Manager Comprehensive Data Set v3.3.2** form export: 527 questions with their official item codes and answer choices.
+- **Instrument file:** `src/config/cds-3-cm/cds-3-cm-v3.3.2.json`
+- **Narrative-to-answer mapping:** `src/config/cds-3-cm/mapping.ts`
+- **Template builder:** `src/config/cds-3-cm/index.ts`
+
+How suggestions work:
+- **About 125 questions are prepared from the narrative.** These include demographics, goals, the memory loss screen, every H.1 IADL / H.2 ADL performance code and "who helps", FIL items, J diagnoses, K.5 falls, the emergency device, therapies and hospital admissions. The others are shown as "complete from the assessment".
+- **Candidates, not a single guessed code.** When the narrative doesn't state the level, the case manager picks the verified code from a dropdown of the official choices. Example: "Assistance is provided with bathing" lists codes `1–5`.
+- **Unmentioned items are never answered "No".** Diagnoses, falls and the like that the narrative doesn't mention are "Not Documented", never `0 - No` / `0 - Not present`.
+- **QA 9 checks the documented FIL against the form's own definitions.** It compares the FIL to the ADL/IADL deficits the narrative can support. Example: "1-C/1-NC requires 4 or more ADLs". It never calculates or certifies the FIL.
+- **Items not on CDS-3-CM have their own section.** Financial, MLS, risk worksheet, consent and IDC items are listed under "Other WellSky records".
+
+**Updating to a new form version:**
+```bash
+node scripts/parse-cds-form.mjs <form-export.pdf> src/config/cds-3-cm/cds-<version>.json   # needs pdftotext (poppler-utils)
+```
+- **Privacy:** form printouts carry the consumer's name and ID in every page header. The script removes page headers and footers, and refuses to write the file if any header text remains. Use a blank form when possible.
+- **After parsing:** check that `npm test` still resolves every mapping (`tests/cds-instrument.test.ts`).
+
 ## Features still needing configuration
 
-- **Official CDS instrument.** Replace the provisional mapping (Settings › CDS template) with the approved field names and answer choices, and add `choices` so responses map to them.
+- **CDS mapping review.** CDS-3-CM v3.3.2 is configured. Program staff should review the narrative-to-answer rules in `src/config/cds-3-cm/mapping.ts`. The "Other WellSky records" section still uses a provisional mapping.
 - **QA checklist wording.** Review the requirement text against the official AgeSpan 2026/2027 checklist and your local policies. Change the `version` on every edit.
-- **FIL calculation.** Intentionally not implemented. Add it only when an approved formula, its inputs and the program rules are provided.
+- **FIL calculation.** Intentionally not implemented. QA 9 only checks the documented FIL against the CDS-3-CM definitions; critical unmet need (C vs. NC) always requires verification.
 - **Visit schedule rules.** QA 2 and QA 12 timing currently needs human verification. Configure program schedules and the business-day calendar if automation is wanted.
 - **Organization onboarding UI.** Profiles are created with SQL today.
 - **Uploading original files to the `case-documents` bucket.** The bucket and its policies exist, but the MVP stores only the extracted text in `documents`.

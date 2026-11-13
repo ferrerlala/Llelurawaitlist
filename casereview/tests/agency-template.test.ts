@@ -42,13 +42,15 @@ describe('Agency note template ("Label: value" fields)', () => {
     for (const id of ['bed_mobility', 'eating', 'telephone']) expect(adl(id).narrativeStatus, id).toBe('Independent');
     for (const id of ['meal_preparation', 'bathing', 'dressing', 'toileting', 'outdoor_mobility', 'shopping']) expect(adl(id).narrativeStatus, id).toBe('Needs Assistance');
     // Level of assistance is not stated, so the CDS response still needs verification.
-    expect(cds('fn_bathing').status).toBe('Needs Verification');
+    expect(cds('H2_bathing').status).toBe('Needs Verification');
+    expect(cds('H2_bathing').candidates).toHaveLength(5);
   });
 
   it('flags activities the narrative documents as both independent and assisted', () => {
     expect(adl('transfers').narrativeStatus).toBe('Conflicting');
     expect(adl('indoor_locomotion').narrativeStatus).toBe('Conflicting');
-    expect(cds('fn_transfers').status).toBe('Unable to Determine');
+    expect(cds('H2_transfer').status).toBe('Unable to Determine');
+    expect(cds('FIL_deficits').suggestedResponse).not.toMatch(/Transfer|Locomotion in home/);
     const high = r.issues.filter((i) => i.priority === 'High').map((i) => i.title);
     expect(high).toContain('Narrative contradicts itself: Transfers');
     expect(high).toContain('Narrative contradicts itself: Indoor locomotion');

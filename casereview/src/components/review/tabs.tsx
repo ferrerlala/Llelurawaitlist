@@ -27,7 +27,7 @@ export function finalCdsValue(review: ReviewRecord, c: CdsResponse): { value: st
 
 export function cdsCopyLine(review: ReviewRecord, c: CdsResponse) {
   const f = finalCdsValue(review, c);
-  return `${c.section} — ${c.label}: ${f.value} [${f.verified ? 'Human-verified' : f.rejected ? 'REJECTED – do not enter' : `Unverified – ${c.status}`}]`;
+  return `${c.section} — ${c.code ? `${c.code} ` : ''}${c.label}: ${f.value} [${f.verified ? 'Human-verified' : f.rejected ? 'REJECTED – do not enter' : `Unverified – ${c.status}`}]`;
 }
 
 function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
@@ -94,38 +94,71 @@ export function SummaryTab({ review }: { review: ReviewRecord }) {
 // ---------------------------------------------------------------------------
 export function CdsTab({ review }: { review: ReviewRecord }) {
   const { settings } = useApp();
-  const [filter, setFilter] = useState('all');
   const a = review.analysis;
-  const items = a.cds.filter((c) => filter === 'all' || c.status === filter || (filter === 'unreviewed' && !review.decisions[decisionKey('cds', c.fieldId)]));
+  // Older reviews (before the instrument was configured) have no "mapped" flag: treat every field as mapped.
+  const isMapped = (c: CdsResponse) => c.mapped !== false;
+  const hasUnmapped = a.cds.some((c) => !isMapped(c));
+  const [scope, setScope] = useState<'mapped' | 'all'>('mapped');
+  const [filter, setFilter] = useState('any');
+  const [query, setQuery] = useState('');
+  const inScope = a.cds.filter((c) => scope === 'all' || isMapped(c));
+  const q = query.trim().toLowerCase();
+  const items = inScope.filter((c) =>
+    (filter === 'any' || c.status === filter || (filter === 'unreviewed' && !review.decisions[decisionKey('cds', c.fieldId)])) &&
+    (!q || `${c.code} ${c.label} ${c.group} ${c.suggestedResponse}`.toLowerCase().includes(q)));
   const sections = [...new Set(items.map((c) => c.section))];
   return (
     <div className="space-y-4">
-      {a.cds.some((c) => c.provisional) && <Notice tone="amber" title="Provisional CDS mapping">{settings.cdsTemplate.notice}</Notice>}
+      <Notice tone={a.cds.some((c) => c.provisional) ? 'amber' : 'blue'} title={settings.cdsTemplate.name}>{settings.cdsTemplate.notice}</Notice>
       <Notice tone="blue" title="WellSky Transfer Guide">
-        Suggested responses are preparation aids. Approve or edit each response after verifying it, then enter verified information into WellSky manually. "Not documented" must never be entered as "No". This tool does not integrate with WellSky.
+        Suggested responses are preparation aids. When the narrative supports more than one answer code, every candidate is listed — select the verified code with Edit. "Not documented" must never be entered as "No" or "Not present". This tool does not integrate with WellSky.
       </Notice>
       <div className="flex flex-wrap items-center gap-2">
+        {hasUnmapped && (
+          <Select value={scope} onChange={(e) => setScope(e.target.value as 'mapped' | 'all')} className="!w-auto">
+            <option value="mapped">Prepared from narrative ({a.cds.filter(isMapped).length})</option>
+            <option value="all">All instrument questions ({a.cds.length})</option>
+          </Select>
+        )}
         <Select value={filter} onChange={(e) => setFilter(e.target.value)} className="!w-auto">
-          <option value="all">All fields ({a.cds.length})</option>
-          {['Ready for Review', 'Needs Verification', 'Not Documented', 'Unable to Determine'].map((s) => <option key={s} value={s}>{s} ({a.cds.filter((c) => c.status === s).length})</option>)}
+          <option value="any">Any status</option>
+          {['Ready for Review', 'Needs Verification', 'Not Documented', 'Unable to Determine'].map((s) => <option key={s} value={s}>{s} ({inScope.filter((c) => c.status === s).length})</option>)}
           <option value="unreviewed">Not yet reviewed</option>
         </Select>
-        <CopyButton label="Copy all (transfer guide)" text={a.cds.map((c) => cdsCopyLine(review, c)).join('\n')} />
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search code or question…" className="!w-56" />
+        <CopyButton label="Copy prepared responses" text={a.cds.filter((c) => isMapped(c) && c.status !== 'Not Documented').map((c) => cdsCopyLine(review, c)).join('\n')} />
       </div>
       {sections.map((s) => {
         const rows = items.filter((c) => c.section === s);
         return (
-          <Card key={s} title={s} actions={<CopyButton label="Copy section" text={rows.map((c) => cdsCopyLine(review, c)).join('\n')} />}>
+          <Card key={s} title={s} subtitle={`${rows.length} question(s)`} actions={<CopyButton label="Copy section" text={rows.map((c) => cdsCopyLine(review, c)).join('\n')} />}>
             <Table>
-              <thead><tr><Th>Field</Th><Th>Suggested response</Th><Th>Supporting sentence</Th><Th>Confidence</Th><Th>Status</Th><Th>Case manager review</Th></tr></thead>
+              <thead><tr><Th>Question</Th><Th>Suggested response</Th><Th>Supporting sentence</Th><Th>Confidence</Th><Th>Status</Th><Th>Case manager review</Th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.map((c) => (
                   <tr key={c.fieldId}>
-                    <Td className="w-40 font-medium text-slate-900">{c.label}{c.provisional && <div className="text-[10px] font-normal uppercase text-amber-700">provisional</div>}</Td>
-                    <Td className="w-56">
-                      <span className={c.status === 'Not Documented' ? 'italic text-slate-500' : ''}>{c.suggestedResponse}</span>
+                    <Td className="w-64 text-slate-900">
+                      {c.code && <span className="mr-1 rounded bg-navy-50 px-1 font-mono text-[10px] text-navy-800">{c.code}</span>}
+                      <span className="font-medium">{c.code ? c.label.replace(/^(\([A-Z]\)\s*)?[a-z]{1,2}\.\s*/, '') : c.label}</span>
+                      {c.group && <div className="text-[10px] uppercase text-slate-400">{c.group}</div>}
+                      {c.provisional && <div className="text-[10px] font-normal uppercase text-amber-700">provisional</div>}
+                    </Td>
+                    <Td className="w-72">
+                      {c.candidates?.length > 1 ? (
+                        <div>
+                          <p className="text-xs font-semibold text-amber-800">Select after verification:</p>
+                          <ul className="mt-0.5 list-disc pl-4 text-xs text-slate-800">{c.candidates.map((x) => <li key={x}>{x}</li>)}</ul>
+                        </div>
+                      ) : (
+                        <span className={c.status === 'Not Documented' ? 'italic text-slate-500' : ''}>{c.suggestedResponse}</span>
+                      )}
                       {c.cdsRecordValue !== null && <div className="mt-1 text-xs text-violet-700">Supplied CDS: {c.cdsRecordValue}</div>}
                       <Collapsible summary="Why"><p className="text-xs text-slate-600">{c.rationale}</p></Collapsible>
+                      {c.choices?.length > 0 && (
+                        <Collapsible summary={`Answer choices (${c.choices.length})`}>
+                          <ul className="space-y-0.5 text-xs text-slate-600">{c.choices.map((x) => <li key={x} className={c.candidates?.includes(x) || c.suggestedResponse === x ? 'font-semibold text-navy-800' : ''}>{x}</li>)}</ul>
+                        </Collapsible>
+                      )}
                     </Td>
                     <Td className="max-w-xs text-xs">
                       {c.evidence[0] ? <><p className="line-clamp-3 text-slate-800" title={c.evidence[0].text}>“{c.evidence[0].text}”</p><p className="mt-0.5 text-slate-500">{formatLocation(c.evidence[0].location)}</p></> : <span className="text-slate-400">None in submitted documentation</span>}
@@ -134,7 +167,7 @@ export function CdsTab({ review }: { review: ReviewRecord }) {
                     <Td>{c.confidence === 'n/a' ? <span className="text-xs text-slate-400">n/a</span> : <Badge>{c.confidence}</Badge>}</Td>
                     <Td><Badge>{c.status}</Badge></Td>
                     <Td className="w-64">
-                      <DecisionControls review={review} kind="cds" itemId={c.fieldId} suggested={c.suggestedResponse} />
+                      <DecisionControls review={review} kind="cds" itemId={c.fieldId} suggested={c.suggestedResponse} options={c.choices} multiple={c.type === 'multi'} />
                       <div className="mt-1"><CopyButton text={cdsCopyLine(review, c)} /></div>
                     </Td>
                   </tr>
@@ -144,7 +177,7 @@ export function CdsTab({ review }: { review: ReviewRecord }) {
           </Card>
         );
       })}
-      {!items.length && <EmptyState title="No fields match this filter" />}
+      {!items.length && <EmptyState title="No questions match this filter" />}
     </div>
   );
 }

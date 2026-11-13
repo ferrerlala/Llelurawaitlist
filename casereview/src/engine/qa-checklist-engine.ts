@@ -7,6 +7,7 @@
 
 import { evidenceOf, type FactIndex } from './facts.ts';
 import { incompleteNames } from './names.ts';
+import { FIL_DEFINITIONS } from '../config/cds-3-cm/mapping.ts';
 
 export { incompleteNames };
 import type {
@@ -61,6 +62,41 @@ function businessDaysBetween(a: Date, b: Date): number {
     if (day !== 0 && day !== 6) count++;
   }
   return count;
+}
+
+const range = (a: number, b: number) => (a === b ? `${a}` : `${a}–${b}`);
+const HELP_STATUSES = ['Needs Assistance', 'Dependent', 'Assistance Provided'];
+const UNKNOWN_STATUSES = ['Not Documented', 'Conflicting', 'Mentioned - Level Not Stated'];
+
+/** Is the documented FIL tier possible given the ADL/IADL deficits the narrative documents? */
+export function filConsistency(ctx: QaContext) {
+  const code = ctx.facts.first('risk.fil_code')?.value?.toUpperCase().replace(/[^0-9A-Z]/g, '');
+  const tierDigit = code?.match(/^([1-4])/)?.[1];
+  if (!code || !tierDigit) return null;
+  const tier = FIL_DEFINITIONS.tiers.find((t) => t.tier === tierDigit);
+  if (!tier) return null;
+  const rows = (ids: readonly string[]) => ctx.adl.filter((r) => ids.includes(r.areaId));
+  const adl = rows(FIL_DEFINITIONS.adlAreas);
+  const iadl = rows(FIL_DEFINITIONS.iadlAreas);
+  const count = (list: typeof adl, statuses: string[]) => list.filter((r) => statuses.includes(r.narrativeStatus));
+  const adlMin = count(adl, HELP_STATUSES).length;
+  const adlMax = adlMin + count(adl, UNKNOWN_STATUSES).length;
+  const iadlMin = count(iadl, HELP_STATUSES).length;
+  const iadlMax = iadlMin + count(iadl, UNKNOWN_STATUSES).length;
+  const overlaps = (lo: number, hi: number, a: number, b: number) => lo <= b && hi >= a;
+  let consistent: boolean;
+  switch (tier.tier) {
+    case '1': consistent = adlMax >= 4; break;
+    case '2': consistent = overlaps(adlMin, adlMax, 2, 3); break;
+    case '3': consistent = overlaps(adlMin, adlMax, 1, 1) || (adlMin <= 1 && iadlMax >= 6); break;
+    default: consistent = adlMin === 0 && overlaps(iadlMin, iadlMax, 4, 5);
+  }
+  const fmt = (list: typeof adl) => list.map((r) => `${r.label}: ${r.narrativeStatus}`).join('; ');
+  return {
+    code, consistent, requirement: tier.text, adlMin, adlMax, iadlMin, iadlMax,
+    detail: `ADLs — ${fmt(adl)}. IADLs — ${fmt(iadl)}.`,
+    evidence: [...new Map([...count(adl, HELP_STATUSES), ...count(iadl, HELP_STATUSES)].flatMap((r) => r.evidence.filter((e) => e.factId).slice(0, 1)).map((e) => [e.text, e])).values()],
+  };
 }
 
 const evaluators: Record<string, Evaluator> = {
@@ -232,10 +268,23 @@ const evaluators: Record<string, Evaluator> = {
     if (!facts.length && !cdsFil.length) return { status: 'Missing', evidenceFound: [], evidenceMissing: ['FIL documentation'], recommendedCorrection: 'Document the FIL and verify the CDS FIL calculation.' };
     const conflict = ctx.discrepancies.find((d) => d.key === 'risk.fil_code');
     if (conflict) return { status: 'Mismatch', evidenceFound: found, evidenceMissing: [], recommendedCorrection: 'FIL values differ between documents. Verify the CDS FIL calculation; the system has not chosen a value.' };
+
+    // Consistency check against the instrument's FIL definitions (not a calculation).
+    const check = filConsistency(ctx);
+    const missing = [approved ? 'Verified FIL inputs' : 'No approved FIL calculation is configured — the system does not calculate FIL or certify eligibility', 'CDS FIL calculation', 'Whether a critical need is unmet (C vs. NC)'];
+    if (check && !check.consistent) {
+      return {
+        status: 'Mismatch', evidenceFound: [...found, ...check.evidence], evidenceMissing: missing,
+        recommendedCorrection: `Documented FIL ${check.code} requires ${check.requirement}. The narrative documents ${check.adlMin} ADL deficit(s) (at most ${check.adlMax} if every undocumented or conflicting ADL needed help) and ${range(check.iadlMin, check.iadlMax)} IADL deficit(s). Either the FIL or the functional documentation needs correction. Verify the ADLs in the CDS and the FIL calculation. (${FIL_DEFINITIONS.source})`,
+        notes: check.detail,
+      };
+    }
     return {
-      status: 'Unable to Verify', evidenceFound: found,
-      evidenceMissing: [approved ? 'Verified FIL inputs' : 'No approved FIL formula/rules configured — the system does not calculate FIL or certify eligibility', 'CDS FIL calculation'],
-      recommendedCorrection: 'Verify the FIL calculation in the CDS and that supporting functional information demonstrates Home Care eligibility. Eligibility statements in the narrative are not verification.',
+      status: 'Unable to Verify', evidenceFound: [...found, ...(check?.evidence ?? [])], evidenceMissing: missing,
+      recommendedCorrection: check
+        ? `Documented FIL ${check.code} (${check.requirement}) is possible given the narrative (${range(check.adlMin, check.adlMax)} ADL and ${range(check.iadlMin, check.iadlMax)} IADL deficits). Verify the FIL calculation in the CDS. Eligibility statements in the narrative are not verification.`
+        : 'Verify the FIL calculation in the CDS and that supporting functional information demonstrates Home Care eligibility. Eligibility statements in the narrative are not verification.',
+      notes: check?.detail,
     };
   },
 

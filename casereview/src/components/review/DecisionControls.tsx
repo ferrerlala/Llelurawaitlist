@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useApp } from '../../app/AppContext.tsx';
 import { applyDecision, clearDecision, decisionKey, type DecisionKind } from '../../data/review-actions.ts';
 import type { ReviewRecord } from '../../data/types.ts';
-import { Badge, Button, Input } from '../ui.tsx';
+import { Badge, Button, Input, Select } from '../ui.tsx';
 
 export function useReviewMutation(_review?: ReviewRecord) {
   const { persist } = useApp();
@@ -23,7 +23,7 @@ export function useReviewMutation(_review?: ReviewRecord) {
 }
 
 /** Approve / edit / reject controls for one AI suggestion. The original suggestion is always kept. */
-export function DecisionControls({ review, kind, itemId, suggested, compact = false }: { review: ReviewRecord; kind: DecisionKind; itemId: string; suggested: string; compact?: boolean }) {
+export function DecisionControls({ review, kind, itemId, suggested, compact = false, options = [], multiple = false }: { review: ReviewRecord; kind: DecisionKind; itemId: string; suggested: string; compact?: boolean; options?: string[]; multiple?: boolean }) {
   const { user } = useApp();
   const m = useReviewMutation(review);
   const d = review.decisions[decisionKey(kind, itemId)];
@@ -38,6 +38,16 @@ export function DecisionControls({ review, kind, itemId, suggested, compact = fa
   if (editing) {
     return (
       <div className="space-y-1.5">
+        {options.length > 0 && (
+          <Select aria-label="Answer choice" value="" onChange={(e) => {
+            const v = e.target.value;
+            if (!v) return;
+            setValue(multiple && value && value !== suggested && !value.includes(v) ? `${value}; ${v}` : v);
+          }}>
+            <option value="">{multiple ? 'Add an answer choice…' : 'Choose the verified answer…'}</option>
+            {options.map((o) => <option key={o} value={o}>{o}</option>)}
+          </Select>
+        )}
         <Input value={value} onChange={(e) => setValue(e.target.value)} aria-label="Verified value" />
         <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reviewer note / source verified (optional)" aria-label="Note" />
         <div className="flex gap-1.5">

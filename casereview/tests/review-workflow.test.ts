@@ -17,7 +17,7 @@ describe('TEST 10 – case manager edits and approves a suggested response', () 
     await repo.saveReview(user, created.review);
     await repo.appendAudit(user, created.audit);
 
-    const field = created.review.analysis.cds.find((c) => c.fieldId === 'fn_bathing')!;
+    const field = created.review.analysis.cds.find((c) => c.fieldId === 'H2_bathing')!;
     expect(field.status).toBe('Not Documented');
     const edited = applyDecision(user, created.review, 'cds', field.fieldId, {
       status: 'edited', value: 'Needs Assistance (verified at visit 10/1/2025)', originalValue: field.suggestedResponse, note: 'Verified with consumer by phone',
@@ -25,15 +25,15 @@ describe('TEST 10 – case manager edits and approves a suggested response', () 
     await repo.saveReview(user, edited.review);
     await repo.appendAudit(user, edited.audit);
 
-    const approved = applyDecision(user, edited.review, 'cds', 'fn_eating', { status: 'approved', value: 'Independent', originalValue: 'Independent' });
+    const approved = applyDecision(user, edited.review, 'cds', 'H2_eating', { status: 'approved', value: '0 - INDEPENDENT', originalValue: '0 - INDEPENDENT' });
     await repo.saveReview(user, approved.review);
     await repo.appendAudit(user, approved.audit);
 
     const saved = (await repo.getReview(user, created.review.id))!;
-    expect(saved.decisions[decisionKey('cds', 'fn_bathing')]).toMatchObject({ status: 'edited', value: 'Needs Assistance (verified at visit 10/1/2025)', originalValue: 'Not documented', byName: 'Demo Case Manager' });
-    expect(saved.decisions[decisionKey('cds', 'fn_eating')].status).toBe('approved');
+    expect(saved.decisions[decisionKey('cds', 'H2_bathing')]).toMatchObject({ status: 'edited', value: 'Needs Assistance (verified at visit 10/1/2025)', originalValue: 'Not documented', byName: 'Demo Case Manager' });
+    expect(saved.decisions[decisionKey('cds', 'H2_eating')].status).toBe('approved');
     // The AI suggestion is preserved unchanged alongside the human decision.
-    expect(saved.analysis.cds.find((c) => c.fieldId === 'fn_bathing')!.suggestedResponse).toBe('Not documented');
+    expect(saved.analysis.cds.find((c) => c.fieldId === 'H2_bathing')!.suggestedResponse).toBe('Not documented');
 
     const log = await repo.listAudit(user, created.review.id);
     expect(log.map((e) => e.action).sort()).toEqual(['decision.approved', 'decision.edited', 'review.created']);
