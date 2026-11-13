@@ -5,6 +5,8 @@ import type { Repository } from '../data/repository.ts';
 import { SupabaseRepository } from '../data/supabase-repository.ts';
 import type { AppUser, AuditEntry, OrgSettings, ReviewRecord, Role } from '../data/types.ts';
 import { supabase } from '../lib/supabase.ts';
+import { HOSTED } from '../lib/hosted.ts';
+import { buildExampleReview } from './seed-example.ts';
 
 interface AppState {
   user: AppUser | null;
@@ -74,8 +76,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) { setReviews([]); return; }
     repo.getSettings(user).then(setSettings).catch(() => setSettings(defaultSettings()));
-    refreshReviews().catch(() => setReviews([]));
-  }, [user, repo, refreshReviews]);
+    (async () => {
+      let list = await repo.listReviews(user);
+      // Hosted demo: start with the fictional Nov 12, 2026 example so the workflow is visible immediately.
+      if (HOSTED && repo.kind === 'local-demo' && !list.length) {
+        const { review, audit } = await buildExampleReview(user, defaultSettings());
+        await repo.saveReview(user, review);
+        await repo.appendAudit(user, audit);
+        list = await repo.listReviews(user);
+      }
+      setReviews(list);
+    })().catch(() => setReviews([]));
+  }, [user, repo]);
 
   const signOut = useCallback(async (reason = '') => {
     setSignOutReason(reason);

@@ -11,6 +11,7 @@ import { audit, reviewProgress, setWorkflowStatus } from '../data/review-actions
 import type { ReviewRecord } from '../data/types.ts';
 import { downloadFile, exportWord, generateReportHtml } from '../report/report-generator.ts';
 import { runIndependentQa } from '../workflow/independent-qa.ts';
+import { HOSTED } from '../lib/hosted.ts';
 
 export type ReviewTabId = 'workflow' | 'journal' | 'fix' | 'score' | 'summary' | 'cds' | 'adl' | 'qa' | 'corrections' | 'followup' | 'report' | 'history';
 
@@ -45,6 +46,7 @@ function ReportTab({ review }: { review: ReviewRecord }) {
 
 export function ReportActions({ review }: { review: ReviewRecord }) {
   const { settings } = useApp();
+  if (HOSTED) return <Notice tone="blue">The full report is shown below. Printing, PDF and Word export are available when the app runs on your organization's own server or computer.</Notice>;
   return (
     <div className="flex flex-wrap gap-2">
       <Link to={`/reviews/${review.id}/print`} target="_blank"><Button variant="primary"><Printer size={15} /> Printable report / Save as PDF</Button></Link>

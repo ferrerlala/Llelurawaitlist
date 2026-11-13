@@ -11,7 +11,8 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:db": "bash scripts/test-rls.sh"
+    "test:db": "bash scripts/test-rls.sh",
+    "build:hosted": "VITE_HOSTED=true vite build --base ./ --outDir dist-hosted"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
