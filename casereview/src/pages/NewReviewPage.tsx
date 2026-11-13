@@ -45,7 +45,7 @@ export function NewReviewPage() {
     const template = which === 'template';
     setCaseIdentifier(template ? 'DEMO-0002' : 'DEMO-0001');
     setAssessmentType('Annual Redetermination');
-    setAssessmentDate(template ? '2026-11-05' : '2025-10-01');
+    setAssessmentDate(template ? '2026-11-12' : '2025-10-01');
     setProgram(template ? 'HCB-NW' : 'Home Care');
     setDocs([{ id: newId('doc'), name: template ? 'Annual assessment – agency template (fictional)' : 'Annual assessment narrative (fictional)', type: 'Narrative / Journal Note', text: template ? SAMPLE_TEMPLATE_NARRATIVE : SAMPLE_NARRATIVE }]);
   };

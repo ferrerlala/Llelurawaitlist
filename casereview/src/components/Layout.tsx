@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { ClipboardCheck, FilePlus2, FileText, LayoutDashboard, ListChecks, ListTodo, LogOut, Settings, ShieldAlert, Table2 } from 'lucide-react';
+import { CalendarPlus, ClipboardCheck, FilePlus2, FileText, LayoutDashboard, ListChecks, ListTodo, LogOut, Settings, ShieldAlert, Table2, Wrench } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useApp } from '../app/AppContext.tsx';
@@ -7,7 +7,9 @@ import { ROLE_LABELS } from '../data/types.ts';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/new', label: 'New Case Review', icon: FilePlus2 },
+  { to: '/annual', label: 'Start Annual Assessment', icon: CalendarPlus },
+  { to: '/new', label: 'Review Existing Note', icon: FilePlus2 },
+  { to: '/fix', label: 'Fix Documentation Issues', icon: Wrench },
   { to: '/cds', label: 'CDS Preparation', icon: ClipboardCheck },
   { to: '/adl', label: 'ADL/IADL Comparison', icon: Table2 },
   { to: '/qa', label: 'Annual QA Review', icon: ListChecks },

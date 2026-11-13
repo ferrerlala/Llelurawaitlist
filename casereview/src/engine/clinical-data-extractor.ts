@@ -131,6 +131,7 @@ const LABEL_RULES: LabelRule[] = [
   { label: /^(health ?care proxy|hcp)$/i, run: (b, e) => e('contacts.health_care_proxy', b) },
   { label: /^(pcp|primary care( physician| provider)?)( (name|info|information|contact))?$/i, run: (b, e) => e('medical.pcp_info', b) },
   { label: /^program( type)?$/i, run: (b, e) => e('program.type', b) },
+  { label: /^financial worksheet/i, run: (b, e) => e('financial.worksheet', `Financial Worksheet: ${b}`, { assertion: /\bnot\b/i.test(b) ? 'not_completed' : 'affirmed' }) },
   { label: /^mls\b/i, run: (b, e) => e('mls.status', b, { assertion: /\bnot\b/i.test(b) ? 'not_completed' : 'affirmed' }) },
   {
     label: /^(person[- ]centered )?goals?(\(s\))?$|^person[- ]centered goal/i,
@@ -174,6 +175,8 @@ function extractContent(s: Sentence, b: string, areas: FunctionalAreaDef[], emit
   let m: RegExpMatchArray | null;
 
   // ---------- Basic ----------
+  // Every sentence of an observations field is an observation (not only the first).
+  if (s.label && /^observations?/i.test(s.label) && !s.isFirst) emit('basic.observations', clean(b));
   if ((m = b.match(/\b(\d{2,3})[- ]year[- ]old\b/i))) emit('basic.age', m[1]);
   if ((m = b.match(/\b(single|married|widowed|divorced|separated)\b/i)) && /consumer|elder|client|year-old/i.test(b)) emit('basic.marital_status', cap(m[1].toLowerCase()));
   if ((m = b.match(/\b(female|male|woman|man)\b/i)) && /year-old|consumer|elder/i.test(b)) emit('basic.gender', /^(female|woman)$/i.test(m[1]) ? 'Female' : 'Male');
@@ -209,7 +212,7 @@ function extractContent(s: Sentence, b: string, areas: FunctionalAreaDef[], emit
   if ((m = b.match(/\b(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\s*(?:\/\s*week\s*|per week\s*|weekly\s*|of\s*)?(?:hha|home health aide)\b/i))) emit('services.hha_hours', `${m[1]} hours HHA`);
   if (/\b(PCA|personal care)\b/i.test(b) && (m = b.match(/\b(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\s*(per week|\/\s*week|weekly|per month|monthly)?/i))) {
     const workers = b.match(/\b(?:through|with|by)\s+(\w+)\s+workers?\b/i)?.[1];
-    emit('services.personal_care', `${m[1]} hours${m[2] ? ` ${m[2].replace(/\s+/g, ' ')}` : ''} PCA${workers ? ` (${workers} workers)` : ''}`);
+    emit('services.personal_care', `${m[1]} hours${m[2] ? ` ${m[2].replace(/\s+/g, ' ')}` : ''} PCA${workers ? ` (${workers} worker${/^(one|1)$/i.test(workers) ? '' : 's'})` : ''}`);
   } else if (!handled.has('services.current') && /\bpersonal care\b|\(PC\)/i.test(b)) emit('services.personal_care', clean(b));
   if (/\bPERS\b/.test(b)) emit('services.pers', /\bno pers\b/i.test(b) ? 'No PERS' : 'PERS in place', { assertion: /\bno pers\b/i.test(b) ? 'reported_absent' : 'affirmed' });
   if (/\brn services?\b/i.test(b)) emit('services.rn', clean(b));

@@ -204,6 +204,68 @@ The parser treats field labels as labels, not values. A label with nothing after
 
 Final status for the sample alone: **Additional Documentation Required**. With the conflicting CDS excerpt or financial worksheet added, it becomes **Corrections Required**.
 
+## Annual assessment workflow (primary workflow)
+
+```
+Previous assessment + new changes → annual journal draft → case manager approval
+  → automatic CDS-3-CM preparation → journal↔CDS consistency validation
+  → Fix Documentation Issues (correction loop) → independent QA audit → score /100 → final approval → report
+```
+
+| Stage | Where | Module |
+|---|---|---|
+| Start Annual Assessment | `/annual` | `src/pages/StartAnnualAssessmentPage.tsx`, `src/workflow/journal-builder.ts`, journal format `src/config/journal-template.ts` |
+| Journal approval → CDS | "Approve journal & prepare CDS" | `approveJournal` in `src/workflow/engine.ts` |
+| Consistency validation | Fix Documentation Issues tab | `src/workflow/consistency.ts` |
+| Correction loop | Fix Documentation Issues tab, `/fix` | `applyFindingAction`, `reviseJournal` in `src/workflow/engine.ts` |
+| Independent QA and score | QA Score tab | `src/workflow/independent-qa.ts` |
+| Final report | Final Report tab | `generateWorkflowReportHtml` in `src/report/report-generator.ts` |
+
+### 1. Prefilled journal
+
+- **Retrieving the previous assessment.** It comes from reviews stored in this application for the same case ID. Notes in the agency template are read field by field; older formats are recovered sentence by sentence.
+- **Per-field review.** For each of the 38 fields in the 24 sections, the case manager marks it Unchanged (confirmed), Changed (enters the update) or Clarify.
+- **Unreviewed fields are never carried forward.** They become `[[CLARIFY: …]]` markers, and the journal cannot be approved while any marker remains.
+- **Visit-specific fields must be re-entered or confirmed.** These include people present, observations, memory screen, consents, application, packet, goals, IDC and planned actions. The assessment date is filled from the form; the next assessment date can't be carried forward.
+- **Changes are detected per fact.** Extracted facts are compared, e.g. "personal care: 30 hours per week PCA (one worker) → 40 hours per week PCA (two workers)", "conditions added: essential tremor", "living arrangement no longer documented: lives alone". Carried-forward items are flagged for checking.
+- **Drafting is rule-based assembly, not generative AI.** Every line is the case manager's text, a previous line they confirmed, or a clarification marker. No medical, service, financial or eligibility content is generated. The whole journal can be edited before approval.
+
+### 2–4. CDS, validation and corrections
+
+- **CDS preparation on approval.** The approved journal is the source document for the CDS-3-CM worksheet. Each answer shows its journal section and evidence; the level is never guessed.
+- **What the validator finds**, each with journal information, CDS answer, exact mismatch, why it matters, suggested correction, and whether clarification is needed:
+  - ADL contradictions;
+  - mobility device vs. independence;
+  - missing ADLs/IADLs and unstated levels;
+  - CDS answers that contradict or lack journal support;
+  - formal vs. informal support (e.g. a family member who is also a paid PCA);
+  - service hours;
+  - copay, financial and risk conflicts;
+  - hospitalization/fall/health-event conflicts;
+  - FIL vs. ADL counts;
+  - blank fields;
+  - QA items needing documentation or a WellSky record.
+- **Fix Documentation Issues actions:** accept a suggested correction (e.g. "Transfers: needs assistance — remove it from the independence statement"), edit, provide missing information, edit a CDS answer, mark a record verified (labeled attestation), mark unable to verify, reject a finding, re-run validation, and bulk-confirm "Ready for Review" answers.
+- **Every journal change is a new approved version.** The CDS is re-prepared and all checks re-run. Decisions whose suggestion changed are invalidated for re-confirmation, the affected CDS answers and QA results are listed, and the original text, every version, every action and the audit log are kept. Final approval is invalidated by any later change.
+
+### 5–7. Independent QA and score
+
+- **Independence.** The reviewer re-reads the final journal and documents with its own extraction pass. It does not reuse the earlier stages' facts, suggestions or QA results, and it re-checks the case manager's final CDS answers against the journal.
+- **Weights.** The 17 categories use the configured weights (Settings › QA checklist `points`).
+  - Status factors: Complete 1, Needs Review 0.5, Unable to Verify 0.25, Missing 0, Mismatch 0. Not Applicable is excluded from the denominator.
+  - Score = earned ÷ applicable points × 100.
+  - **The weighting table as specified totals 101 points.** It is kept as given; the normalized score still ranges 0–100, and Settings shows a warning until the weights are adjusted.
+- **Bands:**
+  - 95–100 Excellent documentation
+  - 90–94 Strong documentation, minor issues may remain
+  - 80–89 Corrections required
+  - 70–79 Significant documentation gaps
+  - Below 70 Not ready for QA review
+- **"Ready for Human QA Review" requires all of:** no unresolved critical finding, no missing required evidence, no unresolved journal/CDS contradiction, and a valid case-manager final approval. A high score never overrides these.
+- **The score is an internal pre-QA estimate**, not an official AgeSpan QA score or a guarantee of approval.
+
+**Acceptance test:** `tests/annual-workflow.test.ts`. It runs the complete workflow on the fictional November 12, 2026 sample (`SAMPLE_PREVIOUS_JOURNAL` + `SAMPLE_ANNUAL_CHANGES`). In the UI: **Start Annual Assessment › Load fictional example**.
+
 ## CDS instrument (CDS-3-CM v3.3.2)
 
 The default CDS template is built from the **CDS-3-CM – Case Manager Comprehensive Data Set v3.3.2** form export: 527 questions with their official item codes and answer choices.

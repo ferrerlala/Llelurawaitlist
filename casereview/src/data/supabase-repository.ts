@@ -17,6 +17,7 @@ interface ReviewRow {
   id: string; organization_id: string; assessment_id: string; created_by: string; created_by_name: string; created_at: string; updated_at: string;
   workflow_status: ReviewRecord['workflowStatus']; analysis: ReviewRecord['analysis']; decisions: Record<string, ReviewDecision>;
   reviewer_notes: string;
+  workflow: ReviewRecord['workflow'] | null;
   cases: { case_identifier: string; program: string } | null;
   assessments: { assessment_type: ReviewInput['assessmentType']; assessment_date: string | null; program: string } | null;
 }
@@ -35,7 +36,7 @@ export class SupabaseRepository implements Repository {
     return {
       id: row.id, organizationId: row.organization_id, createdBy: row.created_by, createdByName: row.created_by_name,
       createdAt: row.created_at, updatedAt: row.updated_at, analysis: row.analysis, decisions: row.decisions ?? {},
-      reviewerNotes: row.reviewer_notes, workflowStatus: row.workflow_status,
+      reviewerNotes: row.reviewer_notes, workflowStatus: row.workflow_status, workflow: row.workflow ?? undefined,
       input: {
         caseIdentifier: row.cases?.case_identifier ?? '', program: row.assessments?.program ?? row.cases?.program ?? '',
         assessmentType: row.assessments?.assessment_type ?? 'Other', assessmentDate: row.assessments?.assessment_date ?? '', documents,
@@ -49,7 +50,7 @@ export class SupabaseRepository implements Repository {
     };
   }
 
-  private readonly reviewSelect = 'id,organization_id,case_id,assessment_id,created_by,created_by_name,created_at,updated_at,workflow_status,analysis,decisions,reviewer_notes,cases(case_identifier,program),assessments(assessment_type,assessment_date,program)';
+  private readonly reviewSelect = 'id,organization_id,case_id,assessment_id,created_by,created_by_name,created_at,updated_at,workflow_status,analysis,decisions,reviewer_notes,workflow,cases(case_identifier,program),assessments(assessment_type,assessment_date,program)';
 
   async listReviews(_user: AppUser) {
     const rows = check(await this.db.from('case_reviews').select(this.reviewSelect).order('created_at', { ascending: false }).limit(200)) as unknown as ReviewRow[];
@@ -81,25 +82,26 @@ export class SupabaseRepository implements Repository {
       check(await this.db.from('case_reviews').insert({
         id: review.id, organization_id: org, case_id: kase.id, assessment_id: assessment.id, created_by: user.id, created_by_name: review.createdByName,
         workflow_status: review.workflowStatus, final_status: a.finalStatus, provider_mode: a.provider.mode, engine_version: a.engineVersion,
-        config_versions: a.configVersions, analysis: a, decisions: review.decisions, reviewer_notes: review.reviewerNotes,
+        config_versions: a.configVersions, analysis: a, decisions: review.decisions, reviewer_notes: review.reviewerNotes, workflow: review.workflow ?? null,
       }));
-      // Normalized, queryable copies of the results.
-      if (a.facts.length) check(await this.db.from('extracted_facts').insert(a.facts.map((f) => ({
-        organization_id: org, review_id: review.id, fact_ref: f.id, fact_key: f.key, category: f.category, value: f.value, detail: f.detail,
-        assertion: f.assertion, source_text: f.sourceText, confidence: f.confidence, doc_name: f.location.docName, line_no: f.location.line, section: f.location.section,
-      }))));
-      check(await this.db.from('qa_results').insert(a.qa.map((q) => ({
-        organization_id: org, review_id: review.id, category_key: q.categoryId, category_number: q.number, title: q.title, status: q.status,
-        evidence_found: q.evidenceFound, evidence_missing: q.evidenceMissing, recommended_correction: q.recommendedCorrection,
-      }))));
-      if (a.discrepancies.length) check(await this.db.from('discrepancies').insert(a.discrepancies.map((d) => ({
-        organization_id: org, review_id: review.id, topic: d.topic, fact_key: d.key, conflicting_values: d.values, explanation: d.explanation,
-      }))));
+      await this.writeDerived(org, review);
     } else {
-      const prev = check(await this.db.from('case_reviews').select('decisions').eq('id', review.id).single()) as { decisions: Record<string, ReviewDecision> };
+      const prev = check(await this.db.from('case_reviews').select('decisions,analysis').eq('id', review.id).single()) as { decisions: Record<string, ReviewDecision>; analysis: ReviewRecord['analysis'] };
+      const reanalyzed = prev.analysis?.generatedAt !== review.analysis.generatedAt;
       check(await this.db.from('case_reviews').update({
-        decisions: review.decisions, reviewer_notes: review.reviewerNotes, workflow_status: review.workflowStatus, updated_at: new Date().toISOString(),
+        decisions: review.decisions, reviewer_notes: review.reviewerNotes, workflow_status: review.workflowStatus, workflow: review.workflow ?? null,
+        analysis: review.analysis, final_status: review.analysis.finalStatus, engine_version: review.analysis.engineVersion, config_versions: review.analysis.configVersions,
+        updated_at: new Date().toISOString(),
       }).eq('id', review.id));
+      if (reanalyzed) {
+        // Journal revised: update document text and regenerate the normalized copies.
+        for (const d of review.input.documents) {
+          const upd = check(await this.db.from('documents').update({ name: d.name, text_content: d.text }).eq('assessment_id', existing.assessment_id).eq('client_doc_id', d.id).select('id')) as { id: string }[];
+          if (!upd.length) check(await this.db.from('documents').insert({ organization_id: org, assessment_id: existing.assessment_id, client_doc_id: d.id, name: d.name, doc_type: d.type, text_content: d.text, created_by: user.id }));
+        }
+        for (const t of ['extracted_facts', 'qa_results', 'discrepancies']) check(await this.db.from(t).delete().eq('review_id', review.id));
+        await this.writeDerived(org, review);
+      }
       // Insert-only approval history for decisions that changed.
       const changed = Object.entries(review.decisions).filter(([k, d]) => prev.decisions?.[k]?.at !== d.at);
       if (changed.length) check(await this.db.from('case_manager_approvals').insert(changed.map(([k, d]) => {
@@ -115,6 +117,24 @@ export class SupabaseRepository implements Repository {
       due_date_source: t.dueDateSource, status: t.status, follow_up: t.followUp, completion_notes: t.completionNotes, evidence: t.evidence,
       updated_at: new Date().toISOString(),
     })), { onConflict: 'review_id,task_key' }));
+  }
+
+  private async writeDerived(org: string, review: ReviewRecord) {
+    const a = review.analysis;
+    {
+      // Normalized, queryable copies of the results.
+      if (a.facts.length) check(await this.db.from('extracted_facts').insert(a.facts.map((f) => ({
+        organization_id: org, review_id: review.id, fact_ref: f.id, fact_key: f.key, category: f.category, value: f.value, detail: f.detail,
+        assertion: f.assertion, source_text: f.sourceText, confidence: f.confidence, doc_name: f.location.docName, line_no: f.location.line, section: f.location.section,
+      }))));
+      check(await this.db.from('qa_results').insert(a.qa.map((q) => ({
+        organization_id: org, review_id: review.id, category_key: q.categoryId, category_number: q.number, title: q.title, status: q.status,
+        evidence_found: q.evidenceFound, evidence_missing: q.evidenceMissing, recommended_correction: q.recommendedCorrection,
+      }))));
+      if (a.discrepancies.length) check(await this.db.from('discrepancies').insert(a.discrepancies.map((d) => ({
+        organization_id: org, review_id: review.id, topic: d.topic, fact_key: d.key, conflicting_values: d.values, explanation: d.explanation,
+      }))));
+    }
   }
 
   async deleteReview(_user: AppUser, id: string) {

@@ -2,6 +2,7 @@ import { DEFAULT_FUNCTIONAL_AREAS } from '@shared/fact-catalog.ts';
 import { buildCds3CmTemplate } from '../config/cds-3-cm/index.ts';
 import { DEFAULT_QA_CHECKLIST } from '../config/qa-checklist.ts';
 import type { OrgSettings } from './types.ts';
+import { DEFAULT_JOURNAL_TEMPLATE } from '../config/journal-template.ts';
 
 export function defaultSettings(): OrgSettings {
   const envMode = import.meta.env?.VITE_AI_MODE === 'claude' ? 'claude' : 'mock';
@@ -13,5 +14,6 @@ export function defaultSettings(): OrgSettings {
     qaChecklist: structuredClone(DEFAULT_QA_CHECKLIST),
     functionalAreas: structuredClone(DEFAULT_FUNCTIONAL_AREAS),
     idleTimeoutMinutes: 15,
+    journalTemplate: structuredClone(DEFAULT_JOURNAL_TEMPLATE),
   };
 }

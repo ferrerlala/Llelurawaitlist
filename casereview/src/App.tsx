@@ -4,6 +4,8 @@ import { Layout } from './components/Layout.tsx';
 import { DashboardPage } from './pages/DashboardPage.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
 import { NewReviewPage } from './pages/NewReviewPage.tsx';
+import { StartAnnualAssessmentPage } from './pages/StartAnnualAssessmentPage.tsx';
+import { FixIssuesPage } from './pages/FixIssuesPage.tsx';
 import { PrintReportPage } from './pages/PrintReportPage.tsx';
 import { ReportsPage } from './pages/ReportsPage.tsx';
 import { ReviewPage } from './pages/ReviewPage.tsx';
@@ -22,7 +24,9 @@ export function App() {
         <Layout>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/annual" element={<StartAnnualAssessmentPage />} />
             <Route path="/new" element={<NewReviewPage />} />
+            <Route path="/fix" element={<FixIssuesPage />} />
             <Route path="/reviews/:id" element={<ReviewPage />} />
             <Route path="/cds" element={<SectionPage section="cds" />} />
             <Route path="/adl" element={<SectionPage section="adl" />} />

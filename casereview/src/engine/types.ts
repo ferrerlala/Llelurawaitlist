@@ -157,6 +157,17 @@ export interface QaCategoryDef {
   priority: 'High' | 'Medium' | 'Low';
   params?: Record<string, number | string | boolean>;
   enabled: boolean;
+  /** Points in the 100-point internal pre-QA score. */
+  points?: number;
+}
+
+export interface QaScoringConfig {
+  /** Share of a category's points earned for each result. Not Applicable is excluded from the denominator. */
+  factors: Record<Exclude<QaStatus, 'Not Applicable'>, number>;
+  bands: { min: number; label: string }[];
+  /** Categories whose Mismatch/Missing result is a critical finding. */
+  criticalCategories: string[];
+  disclaimer: string;
 }
 
 export interface QaChecklist {
@@ -166,6 +177,7 @@ export interface QaChecklist {
   basis: string;
   disclaimer: string;
   categories: QaCategoryDef[];
+  scoring?: QaScoringConfig;
 }
 
 export interface QaResult {

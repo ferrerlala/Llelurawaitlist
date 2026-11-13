@@ -1,5 +1,7 @@
 import type { FunctionalAreaDef } from '@shared/fact-catalog.ts';
 import type { AnalysisResult, CdsTemplate, FollowUpTask, QaChecklist, ReviewInput } from '../engine/types.ts';
+import type { WorkflowState } from '../workflow/types.ts';
+import type { JournalTemplate } from '../config/journal-template.ts';
 
 export type Role = 'case_manager' | 'qa_reviewer' | 'supervisor' | 'admin';
 export const ROLE_LABELS: Record<Role, string> = {
@@ -47,6 +49,8 @@ export interface ReviewRecord {
   tasks: FollowUpTask[];
   reviewerNotes: string;
   workflowStatus: ReviewWorkflowStatus;
+  /** Present for reviews created through "Start Annual Assessment". */
+  workflow?: WorkflowState;
 }
 
 export interface AuditEntry {
@@ -75,4 +79,5 @@ export interface OrgSettings {
   qaChecklist: QaChecklist;
   functionalAreas: FunctionalAreaDef[];
   idleTimeoutMinutes: number;
+  journalTemplate: JournalTemplate;
 }

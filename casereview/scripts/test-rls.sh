@@ -5,4 +5,4 @@
 set -euo pipefail
 : "${DATABASE_URL:?Set DATABASE_URL to an empty throwaway database}"
 cd "$(dirname "$0")/../supabase/tests"
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f supabase_stubs.sql -f ../migrations/20261113000000_initial_schema.sql -f rls_test.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f supabase_stubs.sql -f ../migrations/20261113000000_initial_schema.sql -f ../migrations/20261114000000_annual_workflow.sql -f rls_test.sql

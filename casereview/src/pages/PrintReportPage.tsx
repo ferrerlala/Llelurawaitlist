@@ -1,17 +1,19 @@
 import { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useReview } from '../app/AppContext.tsx';
+import { useApp, useReview } from '../app/AppContext.tsx';
+import { runIndependentQa } from '../workflow/independent-qa.ts';
 import { generateReportHtml } from '../report/report-generator.ts';
 
 /** Standalone printable report. Use the browser's Print dialog to save as PDF. */
 export function PrintReportPage() {
   const { id } = useParams();
   const review = useReview(id);
+  const { settings } = useApp();
   useEffect(() => {
     if (review) document.title = `Case Review Report – ${review.input.caseIdentifier}`;
   }, [review]);
   if (!review) return <p className="p-8 text-sm">Report not found (open it from the same browser session).</p>;
-  const html = generateReportHtml(review);
+  const html = generateReportHtml(review, { independent: review.workflow ? runIndependentQa(review, settings) : undefined });
   const style = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
   const body = html.match(/<body>([\s\S]*)<\/body>/)?.[1] ?? '';
   return (

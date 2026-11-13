@@ -10,7 +10,7 @@ import type { CdsTemplate, QaChecklist } from '../engine/types.ts';
 import type { FunctionalAreaDef } from '@shared/fact-catalog.ts';
 import { buildFactCatalog } from '@shared/fact-catalog.ts';
 
-type JsonKind = 'cdsTemplate' | 'qaChecklist' | 'functionalAreas';
+type JsonKind = 'cdsTemplate' | 'qaChecklist' | 'functionalAreas' | 'journalTemplate';
 
 function validateConfig(kind: JsonKind, value: unknown, areas: FunctionalAreaDef[]): string | null {
   if (kind === 'cdsTemplate') {
@@ -30,6 +30,11 @@ function validateConfig(kind: JsonKind, value: unknown, areas: FunctionalAreaDef
       if (!cat.id || typeof cat.number !== 'number' || !cat.title || !Array.isArray(cat.requirements) || !Array.isArray(cat.requiredRecords)) return `Category ${cat.id ?? '?'} is incomplete`;
       if (!EVALUATOR_IDS.includes(cat.evaluator)) return `Category ${cat.id}: unknown evaluator "${cat.evaluator}". Available: ${EVALUATOR_IDS.join(', ')}`;
     }
+  }
+  if (kind === 'journalTemplate') {
+    const t = value as { id?: string; version?: string; fields?: { id: string; label: string; section: string; group: string; prefix: string; factKeys: unknown }[] };
+    if (!t?.id || !t.version || !Array.isArray(t.fields)) return 'Journal template needs id, version and fields[]';
+    for (const f of t.fields) if (!f.id || !f.label || !f.section || typeof f.group !== 'string' || typeof f.prefix !== 'string' || !Array.isArray(f.factKeys)) return `Journal field ${f.id ?? '?'} needs id, label, section, group, prefix and factKeys[]`;
   }
   if (kind === 'functionalAreas') {
     if (!Array.isArray(value)) return 'Expected an array of functional areas';
@@ -141,8 +146,13 @@ export function SettingsPage() {
             description="Replace the provisional mapping with the official Massachusetts CDS instrument, field names and answer choices. factKeys link fields to the extraction catalog." />
         </div>
         <div className="lg:col-span-2">
+          {(() => { const total = settings.qaChecklist.categories.filter((c) => c.enabled).reduce((n, c) => n + (c.points ?? 0), 0); return total !== 100 ? <Notice tone="amber" className="mb-2">QA scoring weights total {total} points, not 100. The score is normalized (earned ÷ applicable points × 100), so it still ranges 0–100; adjust the weights if they should total exactly 100.</Notice> : null; })()}
           <JsonEditor kind="qaChecklist" title="Annual QA checklist (versioned)" settings={settings} canEdit={canEdit} onSave={save}
             description={`Requirement text, priority, required records, parameters and enabled state are editable. Evaluators: ${EVALUATOR_IDS.join(', ')}.`} />
+        </div>
+        <div className="lg:col-span-2">
+          <JsonEditor kind="journalTemplate" title="Annual journal format" settings={settings} canEdit={canEdit} onSave={save}
+            description="Approved journal headings, labels, order and carry-forward rules used by Start Annual Assessment (unchanged: carry | carry-flag | clarify | never)." />
         </div>
         <div className="lg:col-span-2">
           <JsonEditor kind="functionalAreas" title="ADL/IADL categories" settings={settings} canEdit={canEdit} onSave={save}
