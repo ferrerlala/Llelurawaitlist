@@ -21,7 +21,8 @@ export type FactCategory =
   | 'mls'
   | 'visits'
   | 'suspension'
-  | 'program';
+  | 'program'
+  | 'documentation';
 
 export interface FactKeyDef {
   key: string;
@@ -51,9 +52,9 @@ export const DEFAULT_FUNCTIONAL_AREAS: FunctionalAreaDef[] = [
   { id: 'telephone', label: 'Telephone', type: 'IADL', synonyms: ['telephone use', 'telephone', 'phone use', 'using the phone', 'using the telephone'] },
   { id: 'shopping', label: 'Shopping', type: 'IADL', synonyms: ['shopping', 'grocery shopping', 'groceries'] },
   { id: 'transportation', label: 'Transportation', type: 'IADL', synonyms: ['transportation', 'driving'] },
-  { id: 'bed_mobility', label: 'Bed mobility', type: 'ADL', synonyms: ['bed mobility', 'turning in bed', 'repositioning in bed'] },
+  { id: 'bed_mobility', label: 'Bed mobility', type: 'ADL', synonyms: ['bed mobility', 'mobility in bed', 'turning in bed', 'repositioning in bed'] },
   { id: 'transfers', label: 'Transfers', type: 'ADL', synonyms: ['transfers', 'transferring', 'transfer'] },
-  { id: 'indoor_locomotion', label: 'Indoor locomotion', type: 'ADL', synonyms: ['ambulation in the home', 'indoor locomotion', 'locomotion in the home', 'indoor mobility', 'ambulating in the home', 'walking in the home', 'ambulation indoors', 'mobility in the home'] },
+  { id: 'indoor_locomotion', label: 'Indoor locomotion', type: 'ADL', synonyms: ['ambulation in the home', 'ambulation within the home', 'ambulating within the home', 'mobility within the home', 'indoor locomotion', 'locomotion in the home', 'indoor mobility', 'ambulating in the home', 'walking in the home', 'ambulation indoors', 'mobility in the home'] },
   { id: 'outdoor_mobility', label: 'Outdoor mobility', type: 'ADL', synonyms: ['outdoor mobility', 'locomotion outside', 'ambulation outside', 'mobility outside the home', 'walking outside', 'outdoor locomotion'] },
   { id: 'dressing', label: 'Dressing', type: 'ADL', synonyms: ['dressing', 'getting dressed'] },
   { id: 'eating', label: 'Eating', type: 'ADL', synonyms: ['eating', 'feeding'] },
@@ -82,7 +83,7 @@ const BASE_FACT_KEYS: FactKeyDef[] = [
   f('basic.location', 'basic', 'Assessment location', 'Where the assessment took place.'),
   f('basic.home_environment', 'basic', 'Home environment', 'Description of the home environment.'),
   f('basic.people_present', 'basic', 'People present', 'Who was present at the assessment.'),
-  f('basic.observations', 'basic', 'General observations', 'General observations of the consumer during the visit.'),
+  f('basic.observations', 'basic', 'General observations', 'General observations of the consumer during the visit.', true),
   f('basic.age', 'basic', 'Consumer age', 'Age in years, only if stated.'),
   f('basic.gender', 'basic', 'Gender', 'Gender, only if stated.'),
   f('basic.marital_status', 'basic', 'Marital status', 'Marital status, only if stated (e.g. single, widowed).'),
@@ -98,7 +99,7 @@ const BASE_FACT_KEYS: FactKeyDef[] = [
   f('medical.specialists', 'medical', 'Specialists', 'Specialist providers.', true),
   f('medical.hospitalizations', 'medical', 'Hospitalizations', 'Hospitalizations; use assertion reported_absent if the note says none.'),
   f('medical.falls', 'medical', 'Falls', 'Falls; use assertion reported_absent if the note says no falls.'),
-  f('medical.health_status_change', 'medical', 'Change in health status', 'Changes in medical condition or health status.'),
+  f('medical.health_status_change', 'medical', 'Change in health status', 'Changes in medical condition or health status, including recent surgery or illness; reported_absent if the note says no changes.', true),
 
   f('services.current', 'services', 'Current services', 'Summary of current services as written.'),
   f('services.hha_hours', 'services', 'Home health aide hours', 'HHA hours (value should include the number and unit).'),
@@ -114,7 +115,7 @@ const BASE_FACT_KEYS: FactKeyDef[] = [
   f('services.satisfaction', 'services', 'Service satisfaction', 'Consumer satisfaction with services.'),
   f('services.additional_needs', 'services', 'Additional service needs', 'Additional service needs; reported_absent if none identified.'),
   f('services.informal_supports', 'services', 'Informal supports', 'Family/friend/informal supports.', true),
-  f('services.changes', 'services', 'Changes in services or supports', 'Changes to formal services or informal supports.'),
+  f('services.changes', 'services', 'Changes in needs, services or supports', 'Changes in needs, formal services or informal supports since the last assessment; reported_absent if none.'),
 
   f('financial.annual_income', 'financial', 'Annual income', 'Annual income amount as written.'),
   f('financial.copay', 'financial', 'Copay', 'Copay amount as written.'),
@@ -160,6 +161,7 @@ const BASE_FACT_KEYS: FactKeyDef[] = [
   f('suspension.info', 'suspension', 'Service suspension', 'Service suspension information.', true),
   f('program.type', 'program', 'Program', 'Program as written in the note.'),
   f('program.waiver', 'program', 'Waiver status', 'Waiver status as written.'),
+  f('documentation.blank_field', 'documentation', 'Blank template field', 'A labeled field in the note template that was left empty (value = the label).', true),
 ];
 
 export function functionalFactKey(areaId: string): string {

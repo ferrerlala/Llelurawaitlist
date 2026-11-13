@@ -171,7 +171,15 @@ const evaluators: Record<string, Evaluator> = {
     const cdsGoals = cdsEntries(ctx, /goal/i);
     const found = [...ev(goals), ...cdsEvidence(ctx, cdsGoals)];
     if (!goals.length) return { status: 'Missing', evidenceFound: found, evidenceMissing: ['Consumer goals in the narrative'], recommendedCorrection: 'Document existing and new person-centered goals in the narrative.' };
-    if (!ctx.cdsRecord) return { status: 'Needs Review', evidenceFound: found, evidenceMissing: ['CDS Consumer Goals section (CDS record not supplied)'], recommendedCorrection: 'Verify the CDS Consumer Goals section is complete and matches the narrative goals.' };
+    const noneIdentified = goals.every((g) => g.assertion === 'reported_absent');
+    if (!ctx.cdsRecord) {
+      return {
+        status: 'Needs Review', evidenceFound: found, evidenceMissing: ['CDS Consumer Goals section (CDS record not supplied)'],
+        recommendedCorrection: noneIdentified
+          ? 'The narrative states no person-centered goals were identified. Confirm the CDS Consumer Goals section is completed consistently with this, and consider documenting the consumer\'s preferences or reason no goals were set.'
+          : 'Verify the CDS Consumer Goals section is complete and matches the narrative goals.',
+      };
+    }
     if (!cdsGoals.length) return { status: 'Missing', evidenceFound: found, evidenceMissing: ['Consumer Goals in the supplied CDS record'], recommendedCorrection: 'Complete Consumer Goals in the CDS.' };
     return { status: 'Needs Review', evidenceFound: found, evidenceMissing: [], recommendedCorrection: 'Compare the CDS goals with the narrative goals shown here; confirm they match.' };
   },
@@ -319,17 +327,19 @@ const evaluators: Record<string, Evaluator> = {
 
   timelyFollowUp(ctx) {
     const requests = [...ctx.facts.get('medical.pcp_change_request'), ...ctx.facts.get('goals.identified_needs')];
-    const actions = ctx.facts.get('followup.action');
+    const actions = ctx.facts.get('followup.action').filter((a) => a.assertion !== 'reported_absent');
     const overdue = ctx.facts.get('financial.overdue_balance').filter((f) => (f.normalized.amount ?? 0) > 0);
     const missing: string[] = [];
     if (requests.length && !actions.length) missing.push('Follow-up action for consumer request(s)');
     if (overdue.length && !actions.some((a) => /copay|balance/i.test(a.value))) missing.push('Outstanding copay/balance follow-up');
-    missing.push('Documentation that pending follow-up was completed');
+    if (actions.length) missing.push('Documentation that pending follow-up was completed');
     return {
-      status: missing.length > 1 ? 'Missing' : 'Needs Review', evidenceFound: ev([...requests, ...actions, ...overdue]), evidenceMissing: missing,
+      status: missing.some((x) => !x.startsWith('Documentation that')) ? 'Missing' : 'Needs Review', evidenceFound: ev([...requests, ...actions, ...overdue, ...ctx.facts.get('followup.action').filter((a) => a.assertion === 'reported_absent')]), evidenceMissing: missing,
       recommendedCorrection: actions.length
         ? `Follow-up is planned (${actions.map((a) => a.value).join('; ')}). Document completion with dates.`
-        : 'Document follow-up for consumer, family, vendor and Help Desk requests and status changes.',
+        : ctx.facts.get('followup.action').some((a) => a.assertion === 'reported_absent')
+          ? 'The narrative states no follow-up actions were identified. Confirm there are no open consumer, family, vendor or Help Desk requests, status changes or copay follow-up in the journal.'
+          : 'Document follow-up for consumer, family, vendor and Help Desk requests and status changes.',
     };
   },
 
@@ -338,7 +348,13 @@ const evaluators: Record<string, Evaluator> = {
     if (!idc.length) {
       return { status: 'Missing', evidenceFound: [], evidenceMissing: ['Interdisciplinary conference documentation with full participant names'], recommendedCorrection: 'Document the interdisciplinary conference held for this event (e.g. RD) with the full names of all participants.' };
     }
-    const partial = idc.flatMap((f) => incompleteNames(f.value));
+    if (idc.every((f) => f.assertion === 'reported_absent')) {
+      return {
+        status: 'Needs Review', evidenceFound: ev(idc), evidenceMissing: ['Confirmation that no interdisciplinary conference was required for this event'],
+        recommendedCorrection: 'The narrative states no IDC was indicated. Confirm no IDC was required for this event (RD/RA, service increase, status change, waiver, etc.); if one was held, document it with full participant names.',
+      };
+    }
+    const partial = idc.filter((f) => f.assertion !== 'reported_absent').flatMap((f) => incompleteNames(f.value));
     if (partial.length) {
       return {
         status: 'Missing', evidenceFound: ev(idc), evidenceMissing: partial.map((n) => `Full name of participant: "${n}"`),

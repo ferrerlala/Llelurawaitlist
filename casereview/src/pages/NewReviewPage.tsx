@@ -5,7 +5,7 @@ import { DOCUMENT_TYPES, scanForInjection, type DocumentType, type SourceDocumen
 import { useApp } from '../app/AppContext.tsx';
 import { runAnalysis } from '../app/run-analysis.ts';
 import { Button, Card, Input, Label, Notice, PageHeader, Select, TextArea } from '../components/ui.tsx';
-import { SAMPLE_CDS_RECORD, SAMPLE_FINANCIAL_WORKSHEET, SAMPLE_NARRATIVE } from '../config/sample-data.ts';
+import { SAMPLE_CDS_RECORD, SAMPLE_FINANCIAL_WORKSHEET, SAMPLE_NARRATIVE, SAMPLE_TEMPLATE_NARRATIVE } from '../config/sample-data.ts';
 import { newId } from '../data/repository.ts';
 import { createReview } from '../data/review-actions.ts';
 import { ASSESSMENT_TYPES, type AssessmentType } from '../engine/types.ts';
@@ -41,12 +41,13 @@ export function NewReviewPage() {
   const updateDoc = (id: string, patch: Partial<SourceDocument>) => setDocs((d) => d.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const addDoc = (doc: Partial<SourceDocument>) => setDocs((d) => [...d, { ...blankNarrative(), type: 'Other Supporting Document', name: 'Supporting document', ...doc, id: newId('doc') }]);
 
-  const loadSample = () => {
-    setCaseIdentifier('DEMO-0001');
+  const loadSample = (which: 'bullets' | 'template' = 'bullets') => {
+    const template = which === 'template';
+    setCaseIdentifier(template ? 'DEMO-0002' : 'DEMO-0001');
     setAssessmentType('Annual Redetermination');
-    setAssessmentDate('2025-10-01');
-    setProgram('Home Care');
-    setDocs([{ id: newId('doc'), name: 'Annual assessment narrative (fictional)', type: 'Narrative / Journal Note', text: SAMPLE_NARRATIVE }]);
+    setAssessmentDate(template ? '2026-11-05' : '2025-10-01');
+    setProgram(template ? 'HCB-NW' : 'Home Care');
+    setDocs([{ id: newId('doc'), name: template ? 'Annual assessment – agency template (fictional)' : 'Annual assessment narrative (fictional)', type: 'Narrative / Journal Note', text: template ? SAMPLE_TEMPLATE_NARRATIVE : SAMPLE_NARRATIVE }]);
   };
 
   const onFiles = async (files: FileList | null) => {
@@ -98,7 +99,10 @@ export function NewReviewPage() {
       <PageHeader
         title="New case review"
         description="Paste one annual assessment or journal note, or upload documents. Add supporting documents (CDS record, Financial Worksheet, Consent and Disclosure, Risk Worksheet) to enable cross-document checks."
-        actions={<Button onClick={loadSample}><Sparkles size={15} /> Load fictional sample</Button>}
+        actions={<>
+          <Button onClick={() => loadSample('bullets')}><Sparkles size={15} /> Load fictional sample</Button>
+          <Button onClick={() => loadSample('template')}><Sparkles size={15} /> Load agency-template sample</Button>
+        </>}
       />
       <div className="grid gap-5 lg:grid-cols-3">
         <Card title="Case information" className="lg:col-span-1">

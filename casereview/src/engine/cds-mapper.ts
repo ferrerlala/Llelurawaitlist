@@ -6,6 +6,7 @@ import { findAreas } from './clinical-data-extractor.ts';
 import type { CdsFieldDef, CdsRecordEntry, CdsResponse, CdsStatus, CdsTemplate, Confidence, Fact } from './types.ts';
 import type { FunctionalAreaDef } from '@shared/fact-catalog.ts';
 import { incompleteNames } from './names.ts';
+import { COMPARABLE_KEYS } from './discrepancy-detector.ts';
 
 const CONF_RANK: Record<Confidence, number> = { high: 3, medium: 2, low: 1 };
 
@@ -68,7 +69,7 @@ export function mapToCds(template: CdsTemplate, facts: FactIndex, cdsRecord: Cds
           status: 'Unable to Determine' as CdsStatus, rationale: 'The documentation contains conflicting statements for this activity. Both are shown; the system does not choose.',
         };
       }
-    } else if (!multiple && distinct.size > 1 && new Set(found.map((f) => f.key)).size === 1) {
+    } else if (!multiple && distinct.size > 1 && new Set(found.map((f) => f.key)).size === 1 && COMPARABLE_KEYS.some((k) => k.key === found[0].key)) {
       return {
         ...base, suggestedResponse: `Unable to determine – conflicting values: ${[...new Set(found.map((f) => f.value))].join(' vs. ')}`,
         evidence: found.map(evidenceOf), confidence: 'low' as const, status: 'Unable to Determine' as CdsStatus,
@@ -94,6 +95,9 @@ export function mapToCds(template: CdsTemplate, facts: FactIndex, cdsRecord: Cds
       if (v === 'Assistance Provided' || v === 'Mentioned - Level Not Stated') {
         status = 'Needs Verification';
         reasons.push('The narrative references this activity but does not state the consumer\'s level of independence.');
+      } else if (used.some((f) => /level not specified/i.test(f.detail))) {
+        status = 'Needs Verification';
+        reasons.push('The narrative documents that assistance is needed but not the level (e.g. supervision, limited, extensive). Verify the level before entering the CDS response.');
       }
     }
     if (used.some((f) => f.assertion === 'uncertain')) {

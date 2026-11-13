@@ -15,6 +15,7 @@ const CATEGORY_LABELS: Record<FactCategoryLabel, string> = {
   financial: 'E. Financial and eligibility', eligibility: 'E. Financial and eligibility', risk: 'F. Risk', goals: 'G. Person-centered goals',
   followup: 'H. Documentation and follow-up', contacts: 'H. Documentation and follow-up', consent: 'E. Financial and eligibility',
   mls: 'H. Documentation and follow-up', visits: 'H. Documentation and follow-up', suspension: 'D. Services and supports', program: 'D. Services and supports',
+  documentation: 'H. Documentation and follow-up',
 };
 
 export function finalCdsValue(review: ReviewRecord, c: CdsResponse): { value: string; verified: boolean; rejected: boolean } {

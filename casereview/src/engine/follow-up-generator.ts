@@ -35,7 +35,8 @@ function followUpText(description: string): string {
 }
 
 export function generateFollowUpTasks(facts: FactIndex): FollowUpTask[] {
-  const actions = facts.get('followup.action');
+  // Statements such as "No additional follow-up actions" never become tasks.
+  const actions = facts.get('followup.action').filter((f) => f.assertion !== 'reported_absent');
   const groups: Fact[][] = [];
   for (const a of actions) {
     const g = groups.find((grp) => similarity(grp[0].value, a.value) >= 0.6);

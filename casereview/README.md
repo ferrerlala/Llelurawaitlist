@@ -187,6 +187,21 @@ Expected results for the sample narrative (all covered by `npm test`):
 | 11 | Emergency services permission needs the form and A&D Notes | QA 17: Needs Review |
 | 12 | CDS cannot be declared complete | QA 8: Unable to Verify ("CDS responses were not supplied") |
 
+### Agency-template sample
+
+**Load agency-template sample** loads a fictional annual assessment written in the labeled-field template many agencies use. Its features:
+- `Location of Assessment: …` style fields;
+- `a.` / `4)` / `—` list markers;
+- title-case section headings.
+
+The parser treats field labels as labels, not values. A label with nothing after it is reported as a blank template field. Expected findings (`tests/agency-template.test.ts`):
+- **Transfers** and **Indoor locomotion** are documented as both independent ("independence with transferring, ambulation within the home") and assisted ("Assistance is provided with … transfers, indoor/outdoor mobility"). This is a High-priority correction, and final status is **Corrections Required**.
+- "Assistance is provided with …" is read as Needs Assistance. The level isn't stated, so the CDS responses stay **Needs Verification**.
+- "Self-reported assessment of health:" is left blank, which is flagged.
+- Recent surgery is reported, yet the note also says "no changes in needs" and "no recent hospitalizations". This is flagged for reconciliation.
+- "IDC … None indicated", "did not identify any goals" and "No additional follow-up actions" are documented absences. They are not tasks and not Complete; QA 16 is Needs Review.
+- Income, copay, MassHealth (Pending), Risk 3 / FIL 1C, program (HCB-NW), PCA hours and next assessment are extracted from labeled fields.
+
 Final status for the sample alone: **Additional Documentation Required**. With the conflicting CDS excerpt or financial worksheet added, it becomes **Corrections Required**.
 
 ## Features still needing configuration

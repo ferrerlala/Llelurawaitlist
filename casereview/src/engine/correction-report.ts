@@ -87,6 +87,19 @@ export function buildCorrectionReport(args: {
   }
 
   // ADL / IADL.
+  for (const row of args.adl.filter((r) => r.narrativeStatus === 'Conflicting')) {
+    push({
+      priority: 'High',
+      title: `Narrative contradicts itself: ${row.label}`,
+      problem: `The narrative states both independence and assistance for ${row.label.toLowerCase()}: ${row.evidence.filter((e) => e.factId).map((e) => `"${e.text}"`).join(' and ')}.`,
+      whyItMatters: 'Conflicting ADL/IADL responses affect FIL, eligibility and the care plan, and the CDS cannot be prepared until resolved.',
+      where: [...new Set(row.evidence.map((e) => e.location?.docName))].join(', '),
+      verify: `Confirm the consumer's actual level for ${row.label.toLowerCase()} (and whether different activities were intended, e.g. transfers vs. outdoor mobility).`,
+      suggestedCorrection: 'Correct the narrative so the activity appears once with the verified level. The system has not chosen a value.',
+      source: 'ADL/IADL',
+      evidence: row.evidence,
+    });
+  }
   for (const row of args.adl.filter((r) => r.result === 'Mismatch')) {
     push({
       priority: 'High',
@@ -114,7 +127,7 @@ export function buildCorrectionReport(args: {
       evidence: [],
     });
   }
-  const partial = args.adl.filter((r) => r.narrativeStatus === 'Assistance Provided' || r.narrativeStatus === 'Mentioned - Level Not Stated' || r.narrativeStatus === 'Conflicting');
+  const partial = args.adl.filter((r) => r.narrativeStatus === 'Assistance Provided' || r.narrativeStatus === 'Mentioned - Level Not Stated');
   if (partial.length) {
     push({
       priority: 'Medium',
@@ -156,6 +169,34 @@ export function buildCorrectionReport(args: {
       suggestedCorrection: 'Document the verified information.',
       source: 'CDS',
       evidence: [],
+    });
+  }
+
+  // Template fields left blank.
+  const blanks = args.facts.get('documentation.blank_field');
+  if (blanks.length) {
+    push({
+      priority: 'Medium', title: 'Template field left blank', problem: `No content under: ${blanks.map((b) => `"${b.value}"`).join(', ')}.`,
+      whyItMatters: 'A blank section in the assessment template suggests the information was not collected or not documented.',
+      where: blanks[0].location.docName, verify: 'Confirm whether the information was gathered at the visit.',
+      suggestedCorrection: 'Complete the field with the verified information, or document why it was not obtained.', source: 'Documentation', evidence: blanks.map(evidenceOf),
+    });
+  }
+
+  // A recent health event documented alongside "no changes" statements.
+  const events = args.facts.get('medical.health_status_change').filter((f) => f.assertion === 'affirmed');
+  const noChange = [
+    ...args.facts.get('services.changes'), ...args.facts.get('medical.health_status_change'), ...args.facts.get('medical.hospitalizations'),
+  ].filter((f) => f.assertion === 'reported_absent');
+  if (events.length && noChange.length) {
+    push({
+      priority: 'Medium', title: 'Recent health event documented alongside "no changes"',
+      problem: `The narrative reports ${events.map((e) => `"${e.sourceText}"`).join('; ')} but also states ${noChange.map((e) => `"${e.sourceText}"`).join('; ')}.`,
+      whyItMatters: 'A recent surgery or illness may change needs, services, fall risk or hospitalization history and should be reconciled in the narrative and CDS.',
+      where: events[0].location.docName,
+      verify: 'Confirm the date and setting of the event (inpatient vs. outpatient) and whether needs or services changed as a result.',
+      suggestedCorrection: 'Document the event and its impact (or that there was none) consistently. Do not change other answers without verification.',
+      source: 'Discrepancy', evidence: [...events, ...noChange].map(evidenceOf),
     });
   }
 
@@ -204,7 +245,9 @@ export function determineFinalStatus(args: {
 }): { status: FinalReviewStatus; reasons: string[] } {
   const reasons: string[] = [];
   const mismatches = args.qa.filter((q) => q.status === 'Mismatch').length + args.adl.filter((a) => a.result === 'Mismatch').length;
+  const selfConflicts = args.adl.filter((a) => a.narrativeStatus === 'Conflicting');
   if (args.discrepancies.length) reasons.push(`${args.discrepancies.length} conflicting value(s) between or within documents`);
+  if (selfConflicts.length) reasons.push(`Narrative contradicts itself for: ${selfConflicts.map((a) => a.label).join(', ')}`);
   if (mismatches) reasons.push(`${mismatches} mismatch(es) in QA or ADL/IADL comparison`);
   if (reasons.length) return { status: 'Corrections Required', reasons };
   const missing = args.qa.filter((q) => q.status === 'Missing');
