@@ -2,13 +2,15 @@
 // what must be fixed to pass QA, journal vs CDS mismatches, and every correction made (before → after).
 import clsx from 'clsx';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useApp } from '../../app/AppContext.tsx';
 import type { ReviewRecord } from '../../data/types.ts';
 import { JOURNAL_DOC_ID } from '../../workflow/engine.ts';
 import { runIndependentQa } from '../../workflow/independent-qa.ts';
 import type { ConsistencyFinding } from '../../workflow/types.ts';
 import { useIndependentQa } from './workflow-tabs.tsx';
+import { AssistantPanel } from './assistant-panel.tsx';
+import type { QaResult } from '../../engine/types.ts';
 
 const MISMATCH_KINDS = new Set(['journal_conflict', 'cds_contradiction']);
 
@@ -50,6 +52,7 @@ function FixLink({ onFix }: { onFix: () => void }) {
 
 export function ResultsTab({ review, goTo }: { review: ReviewRecord; goTo: (tab: 'fix' | 'score' | 'journal') => void }) {
   const qa = useIndependentQa(review);
+  const [done, setDone] = useState('');
   const baseline = useBaselineScore(review);
   const s = qa.score;
   const now = s.score;
@@ -118,6 +121,14 @@ export function ResultsTab({ review, goTo }: { review: ReviewRecord; goTo: (tab:
         ))}
       </div>
 
+      {done && (
+        <div className="flex flex-wrap items-center gap-3 border-[1.5px] border-emerald-700 bg-emerald-50 px-5 py-4 text-sm text-emerald-900">
+          <CheckCircle2 size={18} /> <span className="flex-1"><b>Done.</b> {done} The score and every list on this page were re-checked.</span>
+          <button type="button" className="font-mono text-xs underline" onClick={() => setDone('')}>Dismiss</button>
+        </div>
+      )}
+      <AssistantPanel review={review} onDone={setDone} />
+
       <Section n="01" title="Must fix to pass QA" count={mustFix.length + failingQa.length} tone="red" empty="Nothing blocking QA.">
         {mustFix.map((f) => <FindingRow key={f.id} f={f} onFix={() => fix(f.id)} />)}
         {failingQa.map((q) => (
@@ -178,6 +189,7 @@ export function ResultsTab({ review, goTo }: { review: ReviewRecord; goTo: (tab:
           </div>
         ))}
       </Section>
+      <QaLens qa={qa.qa} />
       {versions.length > 1 && (
         <p className="text-sm text-slate-600">The journal was updated {versions.length - 1} time(s). <button type="button" onClick={() => goTo('journal')} className="text-navy-700 underline">Compare journal versions</button></p>
       )}
@@ -195,5 +207,53 @@ function FindingRow({ f, onFix }: { f: ConsistencyFinding; onFix: () => void }) 
       </div>
       <FixLink onFix={onFix} />
     </div>
+  );
+}
+
+const LENS: Record<string, { label: string; cls: string; rank: number }> = {
+  Mismatch: { label: "Doesn't match", cls: 'bg-red-700 text-white', rank: 0 },
+  Missing: { label: 'Missing', cls: 'bg-amber-600 text-white', rank: 1 },
+  'Needs Review': { label: 'Needs a look', cls: 'border border-amber-700 text-amber-800', rank: 2 },
+  'Unable to Verify': { label: 'Check the record', cls: 'border border-slate-500 text-slate-700', rank: 3 },
+  Complete: { label: 'Makes sense', cls: 'bg-emerald-700 text-white', rank: 4 },
+  'Not Applicable': { label: 'Not applicable', cls: 'border border-slate-300 text-slate-500', rank: 5 },
+};
+
+/** The 17 QA categories as a human QA reviewer will read them. */
+function QaLens({ qa }: { qa: QaResult[] }) {
+  const rows = [...qa].sort((a, b) => (LENS[a.status]?.rank ?? 9) - (LENS[b.status]?.rank ?? 9) || a.number - b.number);
+  const n = (st: string) => qa.filter((q) => q.status === st).length;
+  return (
+    <section className="border border-slate-200 bg-white">
+      <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
+        <span className="h-6 w-1.5 bg-slate-900" aria-hidden="true" />
+        <span className="font-mono text-xs text-slate-500">05</span>
+        <h2 className="text-lg font-semibold">What the QA reviewer will look at</h2>
+      </div>
+      <p className="px-4 pt-3 text-sm">
+        <b className="text-emerald-800">{n('Complete')} of {qa.length} make sense.</b>{' '}
+        {n('Mismatch') > 0 && <b className="text-red-700">{n('Mismatch')} don't match. </b>}
+        {n('Missing') > 0 && <b className="text-amber-700">{n('Missing')} missing. </b>}
+        {n('Needs Review') + n('Unable to Verify') > 0 && <span className="text-slate-700">{n('Needs Review') + n('Unable to Verify')} need a record check or a closer look.</span>}
+      </p>
+      <div className="mt-2 divide-y divide-slate-100">
+        {rows.map((q) => {
+          const l = LENS[q.status] ?? LENS['Needs Review'];
+          const ok = q.status === 'Complete' || q.status === 'Not Applicable';
+          return (
+            <div key={q.categoryId} className="grid gap-2 px-4 py-3 md:grid-cols-[150px_1fr_1fr] md:gap-4">
+              <span className={clsx('self-start px-2 py-1 text-center font-mono text-[11px] uppercase', l.cls)}>{l.label}</span>
+              <div>
+                <p className="font-medium">{q.number}. {q.title}</p>
+                <p className="text-xs text-slate-500">QA looks for: {q.requirements.slice(0, 3).join('; ')}{q.requirements.length > 3 ? '…' : ''}</p>
+              </div>
+              <p className={clsx('text-sm', ok ? 'text-emerald-800' : 'text-slate-800')}>
+                {ok ? (q.evidenceFound[0] ? `Found: ${q.evidenceFound[0].text.slice(0, 160)}` : 'Nothing required.') : q.recommendedCorrection}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
