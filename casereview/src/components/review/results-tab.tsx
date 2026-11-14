@@ -50,7 +50,7 @@ function FixLink({ onFix }: { onFix: () => void }) {
   return <button type="button" onClick={onFix} className="shrink-0 border-[1.5px] border-slate-900 bg-white px-3 py-2 font-mono text-xs hover:bg-slate-100">Fix →</button>;
 }
 
-export function ResultsTab({ review, goTo }: { review: ReviewRecord; goTo: (tab: 'fix' | 'score' | 'journal') => void }) {
+export function ResultsTab({ review, goTo }: { review: ReviewRecord; goTo: (tab: 'fix' | 'score' | 'journal' | 'wellsky') => void }) {
   const qa = useIndependentQa(review);
   const [done, setDone] = useState('');
   const baseline = useBaselineScore(review);
@@ -190,6 +190,13 @@ export function ResultsTab({ review, goTo }: { review: ReviewRecord; goTo: (tab:
         ))}
       </Section>
       <QaLens qa={qa.qa} />
+      <section className="flex flex-wrap items-center gap-4 border-[1.5px] border-slate-900 bg-white p-5">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold">{s.readiness.ready ? 'All set — copy it into WellSky' : 'When you are done fixing'}</h2>
+          <p className="text-sm text-slate-600">Get the final journal entry and the confirmed CDS answers, ready to copy and paste.</p>
+        </div>
+        <button type="button" onClick={() => goTo('wellsky')} className="bg-slate-900 px-5 py-3 font-mono text-sm text-white hover:bg-slate-700">Copy to WellSky →</button>
+      </section>
       {versions.length > 1 && (
         <p className="text-sm text-slate-600">The journal was updated {versions.length - 1} time(s). <button type="button" onClick={() => goTo('journal')} className="text-navy-700 underline">Compare journal versions</button></p>
       )}
