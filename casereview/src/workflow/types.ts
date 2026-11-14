@@ -66,6 +66,8 @@ export interface FindingState {
   byName: string;
   at: string;
   title: string;
+  /** What the documentation said or what was wrong before the case manager acted. */
+  before?: string;
   history: { status: FindingStatus; note: string; value?: string; at: string; byName: string }[];
 }
 

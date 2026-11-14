@@ -255,7 +255,7 @@ export function FixIssuesTab({ review }: { review: ReviewRecord }) {
           return (
             <div key={sev} className="space-y-2">
               <h3 className="flex items-center gap-2 text-sm font-semibold"><Badge tone={SEV_TONE[sev]}>{sev}</Badge> {items.length} finding(s)</h3>
-              {items.map((f) => <FindingCard key={f.id} finding={f} review={review} open={isOpen(f, states)} busy={m.busy} onAct={(a) => act(f, a)} />)}
+              {items.map((f) => <div key={f.id} id={`finding-${f.id}`} className="scroll-mt-4"><FindingCard finding={f} review={review} open={isOpen(f, states)} busy={m.busy} onAct={(a) => act(f, a)} /></div>)}
             </div>
           );
         })

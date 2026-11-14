@@ -163,6 +163,7 @@ function withState(review: ReviewRecord, finding: ConsistencyFinding, status: Fi
   const at = new Date().toISOString();
   const state: FindingState = {
     status, note, value, by: user.id, byName: user.name, at, title: finding.title,
+    before: prev?.before ?? (finding.mismatch || finding.journalInfo || finding.cdsAnswer || undefined),
     history: [...(prev?.history ?? []), { status, note, value, at, byName: user.name }],
   };
   return { ...review, workflow: { ...wf, findingStates: { ...wf.findingStates, [finding.id]: state } } };

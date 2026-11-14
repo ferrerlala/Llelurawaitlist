@@ -6,6 +6,7 @@ import { EvidenceProvider } from '../components/review/EvidencePanel.tsx';
 import { useReviewMutation } from '../components/review/DecisionControls.tsx';
 import { AdlTab, CdsTab, CorrectionsTab, FollowUpTab, HistoryTab, QaTab, ReviewerNotes, SummaryTab } from '../components/review/tabs.tsx';
 import { FixIssuesTab, JournalTab, QaScoreTab, WorkflowTab } from '../components/review/workflow-tabs.tsx';
+import { ResultsTab } from '../components/review/results-tab.tsx';
 import { Badge, Button, EmptyState, Notice, PageHeader, Tabs } from '../components/ui.tsx';
 import { audit, reviewProgress, setWorkflowStatus } from '../data/review-actions.ts';
 import type { ReviewRecord } from '../data/types.ts';
@@ -13,10 +14,11 @@ import { downloadFile, exportWord, generateReportHtml } from '../report/report-g
 import { runIndependentQa } from '../workflow/independent-qa.ts';
 import { HOSTED } from '../lib/hosted.ts';
 
-export type ReviewTabId = 'workflow' | 'journal' | 'fix' | 'score' | 'summary' | 'cds' | 'adl' | 'qa' | 'corrections' | 'followup' | 'report' | 'history';
+export type ReviewTabId = 'results' | 'workflow' | 'journal' | 'fix' | 'score' | 'summary' | 'cds' | 'adl' | 'qa' | 'corrections' | 'followup' | 'report' | 'history';
 
 export function ReviewTabContent({ review, tab, goTo }: { review: ReviewRecord; tab: ReviewTabId; goTo?: (t: ReviewTabId) => void }) {
   switch (tab) {
+    case 'results': return review.workflow ? <ResultsTab review={review} goTo={(t) => goTo?.(t)} /> : <SummaryTab review={review} />;
     case 'workflow': return review.workflow ? <WorkflowTab review={review} goTo={(t) => goTo?.(t as ReviewTabId)} /> : <SummaryTab review={review} />;
     case 'journal': return review.workflow ? <JournalTab review={review} /> : <SummaryTab review={review} />;
     case 'fix': return review.workflow ? <FixIssuesTab review={review} /> : <CorrectionsTab review={review} />;
@@ -60,7 +62,7 @@ export function ReviewPage() {
   const { id } = useParams();
   const review = useReview(id);
   const [params, setParams] = useSearchParams();
-  const tab = (params.get('tab') as ReviewTabId) || (review?.workflow ? 'workflow' : 'summary');
+  const tab = (params.get('tab') as ReviewTabId) || (review?.workflow ? 'results' : 'summary');
   if (!review) return <EmptyState title="Review not found"><Link to="/" className="text-navy-700 underline">Back to dashboard</Link></EmptyState>;
   return <ReviewView review={review} tab={tab} setTab={(t) => setParams({ tab: t })} />;
 }
@@ -100,6 +102,7 @@ function ReviewView({ review, tab, setTab }: { review: ReviewRecord; tab: Review
       </div>
       <Tabs<ReviewTabId> value={tab} onChange={setTab} tabs={[
         ...(review.workflow ? [
+          { id: 'results' as const, label: 'Results' },
           { id: 'workflow' as const, label: 'Workflow' },
           { id: 'journal' as const, label: 'Annual Journal', count: review.workflow.journal.versions.length },
           { id: 'fix' as const, label: 'Fix Documentation Issues' },

@@ -97,7 +97,7 @@ export function StartAnnualAssessmentPage() {
         previousReviewId: prevMeta?.id ?? null, previousAssessmentDate: prevMeta?.date ?? null,
       });
       await persist({ ...review, workflow: { ...review.workflow!, aiAttested: attest } }, audit);
-      navigate(`/reviews/${review.id}?tab=workflow`);
+      navigate(`/reviews/${review.id}?tab=results`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
