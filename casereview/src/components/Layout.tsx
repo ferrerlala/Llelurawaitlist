@@ -23,9 +23,12 @@ export function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-navy-950 text-navy-100 md:flex">
-        <div className="px-5 py-5">
-          <p className="text-base font-semibold text-white">CaseReview QA</p>
-          <p className="text-xs text-navy-300">Documentation &amp; CDS review assistant</p>
+        <div className="flex items-center gap-3 px-5 py-5">
+          <div className="grid h-8 w-8 shrink-0 place-items-center border-[1.5px] border-white font-mono text-xs text-white">QA</div>
+          <div>
+            <p className="font-display text-base font-semibold text-white">CaseReview QA</p>
+            <p className="font-mono text-[11px] tracking-widest text-navy-200">LAB · CDS REVIEW</p>
+          </div>
         </div>
         <nav className="flex-1 space-y-0.5 px-3">
           {NAV.map(({ to, label, icon: Icon, end }) => (

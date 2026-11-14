@@ -1,4 +1,3 @@
-import { ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '../app/AppContext.tsx';
 import { Button, Input, Label, Notice, Select } from '../components/ui.tsx';
@@ -14,10 +13,10 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-navy-950 to-navy-800 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md border-[1.5px] border-slate-900 bg-white p-6">
         <div className="mb-5 flex items-center gap-3">
-          <div className="rounded-lg bg-navy-800 p-2 text-white"><ShieldCheck size={22} /></div>
+          <div className="grid h-10 w-10 shrink-0 place-items-center bg-slate-900 font-mono text-sm text-white">QA</div>
           <div>
             <h1 className="text-lg font-semibold text-navy-950">CaseReview QA</h1>
             <p className="text-xs text-slate-500">Case management documentation &amp; CDS review assistant</p>
