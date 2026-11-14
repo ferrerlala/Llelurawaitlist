@@ -15,7 +15,7 @@ import type { QaResult } from '../../engine/types.ts';
 const MISMATCH_KINDS = new Set(['journal_conflict', 'cds_contradiction']);
 
 /** Score of the case as first approved: first journal version, no case manager decisions or fixes. */
-function useBaselineScore(review: ReviewRecord): number | null {
+export function useBaselineScore(review: ReviewRecord): number | null {
   const { settings } = useApp();
   return useMemo(() => {
     const wf = review.workflow;
@@ -227,7 +227,7 @@ const LENS: Record<string, { label: string; cls: string; rank: number }> = {
 };
 
 /** The 17 QA categories as a human QA reviewer will read them. */
-function QaLens({ qa }: { qa: QaResult[] }) {
+export function QaLens({ qa }: { qa: QaResult[] }) {
   const rows = [...qa].sort((a, b) => (LENS[a.status]?.rank ?? 9) - (LENS[b.status]?.rank ?? 9) || a.number - b.number);
   const n = (st: string) => qa.filter((q) => q.status === st).length;
   return (

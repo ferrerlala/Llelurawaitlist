@@ -12,6 +12,9 @@ import { composeJournal, journalProblems, previousValues, type JournalFieldInput
 import { applyFindingAction, approveFinal, approveJournal, cdsJournalGaps, latestJournal, matchCdsToJournal, type Analyzer } from '../src/workflow/engine.ts';
 import { runIndependentQa } from '../src/workflow/independent-qa.ts';
 import { applyDecision } from '../src/data/review-actions.ts';
+import { buildProposals } from '../src/workflow/ai-proposals.ts';
+import { applyProposals } from '../src/workflow/apply-proposals.ts';
+import { readJournalField } from '../src/workflow/journal-builder.ts';
 
 const settings = defaultSettings();
 const user: AppUser = { id: 'cm1', email: 'cm@example.org', name: 'Demo Case Manager', role: 'case_manager', organizationId: 'org', organizationName: 'Demo' };
@@ -166,5 +169,31 @@ describe('Annual assessment workflow (fictional November 12, 2026 sample)', () =
     const open = matched.analysis.cds.filter((c) => c.mapped && c.status === 'Needs Verification');
     expect(open.every((c) => !matched.decisions[`cds:${c.fieldId}`])).toBe(true);
     expect(matched.workflow!.cdsMatch!.journalVersion).toBe(1);
+  });
+
+  it('assistant proposes a fix for everything; approving them resolves all journal and CDS items but never attests records', async () => {
+    let { review } = await buildApprovedReview();
+    const propose = (r: ReviewRecord) => {
+      const qa = runIndependentQa(r, settings);
+      const covered = new Set(qa.openFindings.map((f) => f.id));
+      const cdsChecks = r.analysis.cds.filter((c) => c.mapped && c.status === 'Needs Verification' && !r.decisions[`cds:${c.fieldId}`] && !covered.has(`cds_unresolved:${c.fieldId}`) && c.suggestedResponse.trim() && !/^(Select after verification|Unable to determine|Narrative states)/i.test(c.suggestedResponse));
+      const j = latestJournal(r)!.text;
+      return buildProposals({ findings: qa.openFindings, cdsChecks, journal: j, date: '11/12/2026', readField: (id) => { const f = settings.journalTemplate.fields.find((x) => x.id === id)!; return readJournalField(j, f) ?? ''; } });
+    };
+    const start = runIndependentQa(review, settings).score.score;
+    const first = propose(review);
+    // Every non-record item has a proposal; record checks are never proposed.
+    expect(first.filter((p) => p.section !== 'Records').every((p) => p.proposed >= 0)).toBe(true);
+    expect(first.filter((p) => p.section === 'Records').every((p) => p.proposed === -1 && p.confidence === 'you')).toBe(true);
+    expect(first.find((p) => p.findingId === 'cds_unresolved:B_mls_reason')!.choices[first.find((p) => p.findingId === 'cds_unresolved:B_mls_reason')!.proposed].label).toMatch(/not suspected/);
+    for (let round = 0; round < 2; round++) {
+      const items = propose(review).filter((p) => p.proposed >= 0).map((p) => ({ proposal: p, choice: p.proposed }));
+      review = (await applyProposals(review, items, user, analyze, settings)).review;
+    }
+    const left = propose(review);
+    expect(left.every((p) => p.section === 'Records')).toBe(true);
+    expect(Object.keys(review.workflow!.attestations)).toHaveLength(0);
+    expect(cdsJournalGaps(review).total).toBe(0);
+    expect(runIndependentQa(review, settings).score.score).toBeGreaterThan(start);
   });
 });

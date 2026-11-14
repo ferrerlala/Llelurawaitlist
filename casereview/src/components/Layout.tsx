@@ -1,25 +1,28 @@
 import clsx from 'clsx';
 import { CalendarPlus, ClipboardCheck, FilePlus2, FileText, LayoutDashboard, ListChecks, ListTodo, LogOut, Settings, ShieldAlert, Table2, Wrench } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useApp } from '../app/AppContext.tsx';
 import { ROLE_LABELS } from '../data/types.ts';
 
-const NAV = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+const MAIN = [
+  { to: '/', label: 'Home', icon: LayoutDashboard, end: true },
   { to: '/annual', label: 'Start Annual Assessment', icon: CalendarPlus },
-  { to: '/new', label: 'Review Existing Note', icon: FilePlus2 },
+  { to: '/new', label: 'Check a Note', icon: FilePlus2 },
+  { to: '/reports', label: 'My Cases & Reports', icon: FileText },
+];
+const MORE = [
   { to: '/fix', label: 'Fix Documentation Issues', icon: Wrench },
   { to: '/cds', label: 'CDS Preparation', icon: ClipboardCheck },
   { to: '/adl', label: 'ADL/IADL Comparison', icon: Table2 },
   { to: '/qa', label: 'Annual QA Review', icon: ListChecks },
   { to: '/tasks', label: 'Follow-Up Tasks', icon: ListTodo },
-  { to: '/reports', label: 'Reports', icon: FileText },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user, settings, repo, signOut } = useApp();
+  const [more, setMore] = useState(false);
   return (
     <div className="flex min-h-screen">
       <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-navy-950 text-navy-100 md:flex">
@@ -30,11 +33,20 @@ export function Layout({ children }: { children: ReactNode }) {
             <p className="font-mono text-[11px] tracking-widest text-navy-200">LAB · CDS REVIEW</p>
           </div>
         </div>
-        <nav className="flex-1 space-y-0.5 px-3">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
+          {MAIN.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end}
-              className={({ isActive }) => clsx('flex items-center gap-2.5 rounded-md px-3 py-2 text-sm', isActive ? 'bg-navy-800 text-white' : 'text-navy-200 hover:bg-navy-900 hover:text-white')}>
-              <Icon size={16} /> {label}
+              className={({ isActive }) => clsx('flex items-center gap-3 px-3 py-3 text-base', isActive ? 'bg-navy-800 text-white' : 'text-navy-100 hover:bg-slate-800 hover:text-white')}>
+              <Icon size={18} /> {label}
+            </NavLink>
+          ))}
+          <button type="button" onClick={() => setMore((m) => !m)} className="mt-4 w-full px-3 py-2 text-left font-mono text-[11px] tracking-widest text-navy-300 hover:text-white">
+            {more ? '▾' : '▸'} MORE TOOLS
+          </button>
+          {more && MORE.map(({ to, label, icon: Icon }) => (
+            <NavLink key={to} to={to}
+              className={({ isActive }) => clsx('flex items-center gap-2.5 px-3 py-2 text-sm', isActive ? 'bg-navy-800 text-white' : 'text-navy-200 hover:bg-slate-800 hover:text-white')}>
+              <Icon size={15} /> {label}
             </NavLink>
           ))}
         </nav>
@@ -45,7 +57,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2.5 md:px-6">
           <nav className="flex gap-1 overflow-x-auto md:hidden">
-            {NAV.map(({ to, label, end }) => (
+            {MAIN.map(({ to, label, end }) => (
               <NavLink key={to} to={to} end={end} className={({ isActive }) => clsx('whitespace-nowrap rounded px-2 py-1 text-xs', isActive ? 'bg-navy-800 text-white' : 'text-slate-600')}>{label}</NavLink>
             ))}
           </nav>

@@ -1,7 +1,7 @@
 import { AlertTriangle, ClipboardList, FileWarning, ListTodo } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../app/AppContext.tsx';
-import { Badge, Button, Card, EmptyState, PageHeader, Stat, Table, Td, Th } from '../components/ui.tsx';
+import { Badge, Card, EmptyState, PageHeader, Stat, Table, Td, Th } from '../components/ui.tsx';
 import { reviewProgress } from '../data/review-actions.ts';
 import type { FinalReviewStatus, QaStatus } from '../engine/types.ts';
 
@@ -20,9 +20,25 @@ export function DashboardPage() {
     <>
       <PageHeader
         title={`Welcome, ${user?.name}`}
-        description="Review documentation quality, prepare CDS responses for verified entry into WellSky, and track corrections and follow-up."
-        actions={<Link to="/new"><Button variant="primary">New case review</Button></Link>}
+        description="What would you like to do?"
       />
+      <div className="mb-6 grid gap-3 md:grid-cols-2">
+        <Link to="/annual" className="flex items-center gap-4 border-[1.5px] border-slate-900 bg-slate-900 p-6 text-white hover:bg-slate-700">
+          <span className="grid h-12 w-12 shrink-0 place-items-center border-[1.5px] border-white font-mono text-xl">1</span>
+          <span><span className="block text-xl font-semibold">Start an annual assessment</span><span className="block text-sm text-navy-100">Build the journal, then let the assistant fix it.</span></span>
+        </Link>
+        {reviews[0] ? (
+          <Link to={`/reviews/${reviews[0].id}`} className="flex items-center gap-4 border-[1.5px] border-slate-900 bg-white p-6 hover:bg-slate-100">
+            <span className="grid h-12 w-12 shrink-0 place-items-center border-[1.5px] border-slate-900 font-mono text-xl">2</span>
+            <span><span className="block text-xl font-semibold">Continue case {reviews[0].input.caseIdentifier}</span><span className="block text-sm text-slate-600">Approve fixes, check the score, copy to WellSky.</span></span>
+          </Link>
+        ) : (
+          <Link to="/new" className="flex items-center gap-4 border-[1.5px] border-slate-900 bg-white p-6 hover:bg-slate-100">
+            <span className="grid h-12 w-12 shrink-0 place-items-center border-[1.5px] border-slate-900 font-mono text-xl">2</span>
+            <span><span className="block text-xl font-semibold">Check a note</span><span className="block text-sm text-slate-600">Paste a note and see what QA would flag.</span></span>
+          </Link>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Cases reviewed" value={reviews.length} icon={<ClipboardList size={16} />} />
         <Stat label="Needing corrections" value={needsCorrections} tone="red" icon={<AlertTriangle size={16} />} hint="Final status: Corrections Required" />

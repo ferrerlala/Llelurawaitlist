@@ -8,6 +8,7 @@ import { AdlTab, CdsTab, CorrectionsTab, FollowUpTab, HistoryTab, QaTab, Reviewe
 import { FixIssuesTab, JournalTab, QaScoreTab, WorkflowTab } from '../components/review/workflow-tabs.tsx';
 import { ResultsTab } from '../components/review/results-tab.tsx';
 import { WellskyTab } from '../components/review/wellsky-tab.tsx';
+import { GuideView } from '../components/review/guide.tsx';
 import { Badge, Button, EmptyState, Notice, PageHeader, Tabs } from '../components/ui.tsx';
 import { audit, reviewProgress, setWorkflowStatus } from '../data/review-actions.ts';
 import type { ReviewRecord } from '../data/types.ts';
@@ -15,10 +16,11 @@ import { downloadFile, exportWord, generateReportHtml } from '../report/report-g
 import { runIndependentQa } from '../workflow/independent-qa.ts';
 import { HOSTED } from '../lib/hosted.ts';
 
-export type ReviewTabId = 'results' | 'wellsky' | 'workflow' | 'journal' | 'fix' | 'score' | 'summary' | 'cds' | 'adl' | 'qa' | 'corrections' | 'followup' | 'report' | 'history';
+export type ReviewTabId = 'guide' | 'results' | 'wellsky' | 'workflow' | 'journal' | 'fix' | 'score' | 'summary' | 'cds' | 'adl' | 'qa' | 'corrections' | 'followup' | 'report' | 'history';
 
 export function ReviewTabContent({ review, tab, goTo }: { review: ReviewRecord; tab: ReviewTabId; goTo?: (t: ReviewTabId) => void }) {
   switch (tab) {
+    case 'guide': return review.workflow ? <GuideView review={review} onAdvanced={() => goTo?.('results')} /> : <SummaryTab review={review} />;
     case 'wellsky': return review.workflow ? <WellskyTab review={review} goTo={(t) => goTo?.(t)} /> : <SummaryTab review={review} />;
     case 'results': return review.workflow ? <ResultsTab review={review} goTo={(t) => goTo?.(t)} /> : <SummaryTab review={review} />;
     case 'workflow': return review.workflow ? <WorkflowTab review={review} goTo={(t) => goTo?.(t as ReviewTabId)} /> : <SummaryTab review={review} />;
@@ -64,7 +66,7 @@ export function ReviewPage() {
   const { id } = useParams();
   const review = useReview(id);
   const [params, setParams] = useSearchParams();
-  const tab = (params.get('tab') as ReviewTabId) || (review?.workflow ? 'results' : 'summary');
+  const tab = (params.get('tab') as ReviewTabId) || (review?.workflow ? 'guide' : 'summary');
   if (!review) return <EmptyState title="Review not found"><Link to="/" className="text-navy-700 underline">Back to dashboard</Link></EmptyState>;
   return <ReviewView review={review} tab={tab} setTab={(t) => setParams({ tab: t })} />;
 }
@@ -76,8 +78,20 @@ function ReviewView({ review, tab, setTab }: { review: ReviewRecord; tab: Review
   const [confirmDelete, setConfirmDelete] = useState(false);
   const a = review.analysis;
   const p = reviewProgress(review);
+  if (tab === 'guide' && review.workflow) {
+    return (
+      <EvidenceProvider documents={review.input.documents}>
+        <div className="mb-5">
+          <h1 className="text-3xl font-semibold">Case {review.input.caseIdentifier}</h1>
+          <p className="text-base text-slate-600">{review.input.assessmentType} · {review.input.assessmentDate || 'date not entered'}</p>
+        </div>
+        <ReviewTabContent review={review} tab="guide" goTo={setTab} />
+      </EvidenceProvider>
+    );
+  }
   return (
     <EvidenceProvider documents={review.input.documents}>
+      {review.workflow && <button type="button" onClick={() => setTab('guide')} className="no-print mb-3 border-[1.5px] border-slate-900 bg-white px-4 py-2 font-mono text-sm hover:bg-slate-100">← Back to the simple guide</button>}
       <PageHeader
         title={`Case ${review.input.caseIdentifier}`}
         description={<span>{review.input.assessmentType} · {review.input.assessmentDate || 'date not entered'} · {review.input.program || 'program not entered'} · {review.input.documents.length} document(s)</span>}
