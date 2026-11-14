@@ -139,6 +139,50 @@ export async function reviseJournal(review: ReviewRecord, newText: string, reaso
   };
 }
 
+export interface CdsMatchSummary { journalVersion: number; at: string; confirmed: number; updated: number; needPick: number }
+
+/** CDS answers that do not yet follow the final journal: unconfirmed single answers, or confirmed values that differ from it. */
+export function cdsJournalGaps(review: ReviewRecord) {
+  const unconfirmed: string[] = [];
+  const differs: string[] = [];
+  for (const c of review.analysis.cds) {
+    if (!c.mapped || c.status !== 'Ready for Review' || !c.suggestedResponse.trim()) continue;
+    const d = review.decisions[`cds:${c.fieldId}`];
+    if (!d || d.status === 'rejected') unconfirmed.push(c.fieldId);
+    else if (d.value.trim() !== c.suggestedResponse.trim()) differs.push(c.fieldId);
+  }
+  return { unconfirmed, differs, total: unconfirmed.length + differs.length };
+}
+
+/**
+ * Fill the CDS from the final approved journal so both records match: every CDS answer the journal
+ * supports with one clear answer is confirmed, and any confirmed answer that no longer matches the
+ * journal is updated to the journal's answer. Answers the journal leaves open are never guessed.
+ */
+export function matchCdsToJournal(review: ReviewRecord, user: AppUser): { review: ReviewRecord; audit: AuditEntry[]; summary: CdsMatchSummary } {
+  const v = latestJournal(review)?.version ?? 1;
+  let r = review;
+  const entries: AuditEntry[] = [];
+  let confirmed = 0, updated = 0, needPick = 0;
+  for (const c of review.analysis.cds) {
+    if (!c.mapped) continue;
+    const d = r.decisions[`cds:${c.fieldId}`];
+    if (c.status === 'Ready for Review' && c.suggestedResponse.trim()) {
+      const same = d && d.status !== 'rejected' && d.value.trim() === c.suggestedResponse.trim();
+      if (same) continue;
+      const res = applyDecision(user, r, 'cds', c.fieldId, {
+        status: 'approved', value: c.suggestedResponse, originalValue: c.suggestedResponse,
+        note: d ? `Updated to match the final journal v${v} (was: ${d.value})` : `Filled from the final journal v${v}`,
+      });
+      r = res.review; entries.push(...res.audit);
+      if (d) updated++; else confirmed++;
+    } else if ((c.status === 'Needs Verification' || c.status === 'Unable to Determine') && !d) needPick++;
+  }
+  const summary: CdsMatchSummary = { journalVersion: v, at: new Date().toISOString(), confirmed, updated, needPick };
+  entries.push(audit(user, review.id, 'cds.matched_to_journal', 'review', review.id, null, `Journal v${v}: ${confirmed} filled, ${updated} updated, ${needPick} need the case manager`));
+  return { review: r.workflow ? { ...r, workflow: { ...r.workflow, cdsMatch: summary } } : r, audit: entries, summary };
+}
+
 /** Re-run validation without a journal change (e.g. after settings change). */
 export async function rerunValidation(review: ReviewRecord, user: AppUser, analyze: Analyzer) {
   const analysis = await analyze(review.input);

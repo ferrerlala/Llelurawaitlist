@@ -9,7 +9,7 @@ import { runValidation } from '../src/engine/analyze.ts';
 import { extractWithRules } from '../src/engine/clinical-data-extractor.ts';
 import type { ReviewInput } from '../src/engine/types.ts';
 import { composeJournal, journalProblems, previousValues, type JournalFieldInput } from '../src/workflow/journal-builder.ts';
-import { applyFindingAction, approveFinal, approveJournal, latestJournal, type Analyzer } from '../src/workflow/engine.ts';
+import { applyFindingAction, approveFinal, approveJournal, cdsJournalGaps, latestJournal, matchCdsToJournal, type Analyzer } from '../src/workflow/engine.ts';
 import { runIndependentQa } from '../src/workflow/independent-qa.ts';
 import { applyDecision } from '../src/data/review-actions.ts';
 
@@ -148,5 +148,23 @@ describe('Annual assessment workflow (fictional November 12, 2026 sample)', () =
     expect(latestJournal(review)!.version).toBeGreaterThanOrEqual(7);
     expect(review.workflow!.journal.versions[0].text).toContain('transfers, indoor/outdoor mobility');
     expect(Object.keys(review.workflow!.findingStates).length).toBeGreaterThan(10);
+  });
+
+  it('fills the CDS from the final journal so both records match, without guessing open answers', async () => {
+    const { review } = await buildApprovedReview();
+    const before = cdsJournalGaps(review);
+    expect(before.unconfirmed.length).toBeGreaterThan(10);
+    // A stale confirmed answer that differs from the journal is updated to the journal's answer.
+    const ready = review.analysis.cds.find((c) => c.mapped && c.status === 'Ready for Review' && c.suggestedResponse)!;
+    const stale = applyDecision(user, review, 'cds', ready.fieldId, { status: 'edited', value: 'WRONG', originalValue: ready.suggestedResponse, note: 'test' }).review;
+    expect(cdsJournalGaps(stale).differs).toContain(ready.fieldId);
+    const { review: matched, summary } = matchCdsToJournal(stale, user);
+    expect(cdsJournalGaps(matched).total).toBe(0);
+    expect(summary.updated).toBe(1);
+    expect(matched.decisions[`cds:${ready.fieldId}`].value).toBe(ready.suggestedResponse);
+    // Answers with more than one supported code stay unconfirmed for the case manager.
+    const open = matched.analysis.cds.filter((c) => c.mapped && c.status === 'Needs Verification');
+    expect(open.every((c) => !matched.decisions[`cds:${c.fieldId}`])).toBe(true);
+    expect(matched.workflow!.cdsMatch!.journalVersion).toBe(1);
   });
 });

@@ -107,4 +107,6 @@ export interface WorkflowState {
   attestations: Record<string, Attestation>;
   finalApproval: FinalApproval | null;
   lastRerun: RerunImpact | null;
+  /** Last time the CDS was filled from the final journal. */
+  cdsMatch?: { journalVersion: number; at: string; confirmed: number; updated: number; needPick: number };
 }

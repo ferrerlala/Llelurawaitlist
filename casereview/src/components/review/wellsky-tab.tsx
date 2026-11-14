@@ -1,11 +1,12 @@
 // "Copy to WellSky": the final approved journal entry and the confirmed CDS answers, ready to paste.
 // Only answers the case manager confirmed are offered for entry; everything else is listed as not ready.
 import clsx from 'clsx';
-import { Check, Copy } from 'lucide-react';
-import { useState } from 'react';
+import { Check, CheckCircle2, Copy, Loader2, RefreshCw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useApp } from '../../app/AppContext.tsx';
 import type { CdsResponse } from '../../engine/types.ts';
 import type { ReviewRecord } from '../../data/types.ts';
-import { latestJournal } from '../../workflow/engine.ts';
+import { cdsJournalGaps, latestJournal, matchCdsToJournal } from '../../workflow/engine.ts';
 import { useIndependentQa } from './workflow-tabs.tsx';
 
 async function copyText(text: string): Promise<boolean> {
@@ -46,7 +47,25 @@ const line = (a: Answer) => `${a.c.code ? `${a.c.code} ` : ''}${a.c.label}: ${a.
 
 export function WellskyTab({ review, goTo }: { review: ReviewRecord; goTo: (tab: 'results' | 'fix') => void }) {
   const qa = useIndependentQa(review);
+  const { user, persist } = useApp();
   const journal = latestJournal(review);
+  const gaps = cdsJournalGaps(review);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState('');
+  const sync = async () => {
+    if (!user) return;
+    setSyncing(true); setSyncError('');
+    try { const m = matchCdsToJournal(review, user); await persist(m.review, m.audit); } catch (e) { setSyncError((e as Error).message); } finally { setSyncing(false); }
+  };
+  // When the journal is final (no open findings), fill the CDS from it automatically so both records match.
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoRan.current || !user || gaps.total === 0 || qa.openFindings.length > 0) return;
+    autoRan.current = true;
+    void sync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gaps.total, qa.openFindings.length, user]);
+  const match = review.workflow?.cdsMatch;
   const journalText = journal?.text ?? '';
 
   const confirmed: Answer[] = [];
@@ -78,6 +97,23 @@ export function WellskyTab({ review, goTo }: { review: ReviewRecord; goTo: (tab:
           </p>
         </div>
         {!ready && <button type="button" onClick={() => goTo('results')} className="border-[1.5px] border-slate-900 bg-white px-4 py-3 font-mono text-sm hover:bg-slate-100">Go to Results →</button>}
+      </section>
+
+      {/* Journal ↔ CDS match */}
+      <section className={clsx('flex flex-wrap items-center gap-4 border-[1.5px] p-5', gaps.total === 0 ? 'border-emerald-700 bg-white' : 'border-navy-700 bg-white')}>
+        {syncing ? <Loader2 className="animate-spin text-navy-700" size={24} /> : gaps.total === 0 ? <CheckCircle2 className="text-emerald-700" size={24} /> : <RefreshCw className="text-navy-700" size={24} />}
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold">
+            {syncing ? 'Filling the CDS from the final journal…' : gaps.total === 0 ? `The CDS matches the final journal (v${journal?.version})` : `${gaps.total} CDS answer(s) don't follow the final journal yet`}
+          </h2>
+          <p className="text-sm text-slate-600">
+            {gaps.total === 0
+              ? (match ? `Last filled ${new Date(match.at).toLocaleString()}: ${match.confirmed} filled, ${match.updated} updated.` : 'Every CDS answer the journal states clearly is confirmed and matches it.') + (match?.needPick ? ` ${match.needPick} answer(s) the journal leaves open still need you.` : '')
+              : `${gaps.unconfirmed.length} not filled in yet${gaps.differs.length ? `, ${gaps.differs.length} different from the journal` : ''}. Answers the journal leaves open are never guessed.`}
+          </p>
+          {syncError && <p className="text-sm text-red-700">{syncError}</p>}
+        </div>
+        {gaps.total > 0 && !syncing && <button type="button" onClick={sync} disabled={!user} className="bg-navy-700 px-5 py-3 font-mono text-sm text-white hover:bg-navy-900 disabled:opacity-40">Fill CDS from journal</button>}
       </section>
 
       {/* 1. Journal */}
