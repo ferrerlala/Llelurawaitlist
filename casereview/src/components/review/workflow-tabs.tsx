@@ -201,7 +201,19 @@ export function JournalTab({ review }: { review: ReviewRecord }) {
 }
 
 // ---------------------------------------------------------------------------
-const SEV_TONE = { Critical: 'red', High: 'amber', Medium: 'blue', Low: 'slate' } as const;
+export type IssueCategory = 'Critical' | 'Needs Correction' | 'Missing' | 'Needs Verification';
+export const ISSUE_CATEGORIES: { id: IssueCategory; help: string; tone: 'red' | 'amber' | 'blue' | 'slate' }[] = [
+  { id: 'Critical', help: 'Must be resolved before the final review.', tone: 'red' },
+  { id: 'Needs Correction', help: 'The information does not match.', tone: 'amber' },
+  { id: 'Missing', help: 'Required information is absent.', tone: 'blue' },
+  { id: 'Needs Verification', help: 'A supporting record is required.', tone: 'slate' },
+];
+export function issueCategory(f: ConsistencyFinding): IssueCategory {
+  if (f.kind === 'record_verification') return 'Needs Verification';
+  if (f.severity === 'Critical') return 'Critical';
+  if (f.kind === 'journal_missing' || f.kind === 'cds_unresolved') return 'Missing';
+  return 'Needs Correction';
+}
 
 export function FixIssuesTab({ review }: { review: ReviewRecord }) {
   const { user, settings } = useApp();
@@ -249,12 +261,12 @@ export function FixIssuesTab({ review }: { review: ReviewRecord }) {
           </Table>
         ) : <EmptyState title="No corrections recorded yet" />
       ) : !list.length ? <EmptyState title="No open findings">Re-run validation after any change. Check the QA Score tab for remaining verification items.</EmptyState> : (
-        (['Critical', 'High', 'Medium', 'Low'] as const).map((sev) => {
-          const items = list.filter((f) => f.severity === sev);
+        ISSUE_CATEGORIES.map((cat) => {
+          const items = list.filter((f) => issueCategory(f) === cat.id);
           if (!items.length) return null;
           return (
-            <div key={sev} className="space-y-2">
-              <h3 className="flex items-center gap-2 text-sm font-semibold"><Badge tone={SEV_TONE[sev]}>{sev}</Badge> {items.length} finding(s)</h3>
+            <div key={cat.id} className="space-y-2">
+              <h3 className="flex flex-wrap items-center gap-2 text-base font-semibold"><Badge tone={cat.tone}>{cat.id}</Badge> {items.length} issue(s) <span className="text-sm font-normal text-slate-500">— {cat.help}</span></h3>
               {items.map((f) => <div key={f.id} id={`finding-${f.id}`} className="scroll-mt-4"><FindingCard finding={f} review={review} open={isOpen(f, states)} busy={m.busy} onAct={(a) => act(f, a)} /></div>)}
             </div>
           );
@@ -276,11 +288,12 @@ function FindingCard({ finding: f, review, open, busy, onAct }: { finding: Consi
     <Card title={f.title} subtitle={`${f.category}${f.journalSection ? ` · Journal: ${f.journalSection}` : ''}`}
       actions={<>{f.requiresClarification && <Badge tone="purple">Needs case manager clarification</Badge>}{!open && <Badge tone="slate">closed</Badge>}<EvidenceButton title={f.title} evidence={f.evidence} /></>}>
       <dl className="grid gap-3 text-sm md:grid-cols-2">
-        <div><dt className="text-xs font-semibold uppercase text-slate-500">Journal information</dt><dd className="text-slate-800">{f.journalInfo || '—'}</dd></div>
-        <div><dt className="text-xs font-semibold uppercase text-slate-500">CDS answer</dt><dd className="text-slate-800">{f.cdsAnswer || '—'}</dd></div>
-        <div><dt className="text-xs font-semibold uppercase text-slate-500">Exact mismatch</dt><dd className="text-red-800">{f.mismatch}</dd></div>
-        <div><dt className="text-xs font-semibold uppercase text-slate-500">Why it is an issue</dt><dd className="text-slate-700">{f.whyItMatters}</dd></div>
-        <div className="md:col-span-2"><dt className="text-xs font-semibold uppercase text-slate-500">Suggested correction</dt><dd className="text-slate-700">{f.suggestedCorrection}</dd></div>
+        <div className="md:col-span-2"><dt className="text-xs font-semibold text-slate-500">1. What is wrong</dt><dd className="text-red-800">{f.mismatch || f.title}</dd></div>
+        <div><dt className="text-xs font-semibold text-slate-500">2. Where it appears — journal{f.journalSection ? ` (${f.journalSection})` : ''}</dt><dd className="text-slate-800">{f.journalInfo || '—'}</dd></div>
+        <div><dt className="text-xs font-semibold text-slate-500">2. Where it appears — CDS</dt><dd className="text-slate-800">{f.cdsAnswer || '—'}</dd></div>
+        <div><dt className="text-xs font-semibold text-slate-500">3. Why it matters</dt><dd className="text-slate-700">{f.whyItMatters}</dd></div>
+        <div><dt className="text-xs font-semibold text-slate-500">4. What needs correction</dt><dd className="text-slate-700">{f.suggestedCorrection}</dd></div>
+        {f.options.length > 0 && <div className="md:col-span-2"><dt className="text-xs font-semibold text-slate-500">5. Suggested correction (supported by the journal)</dt><dd className="text-slate-700">{f.options.map((o) => o.label).join(' — or — ')}</dd></div>}
       </dl>
       {(f.cdsFieldIds.length > 0 || f.qaCategoryIds.length > 0) && (
         <p className="mt-2 text-xs text-slate-500">Affects: {[...f.cdsFieldIds.slice(0, 6).map((x) => `CDS ${x}`), ...f.qaCategoryIds.map((x) => `QA ${x}`)].join(', ')}{f.cdsFieldIds.length > 6 ? ` +${f.cdsFieldIds.length - 6} more` : ''}</p>

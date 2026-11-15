@@ -159,7 +159,7 @@ export function cdsJournalGaps(review: ReviewRecord) {
  * supports with one clear answer is confirmed, and any confirmed answer that no longer matches the
  * journal is updated to the journal's answer. Answers the journal leaves open are never guessed.
  */
-export function matchCdsToJournal(review: ReviewRecord, user: AppUser): { review: ReviewRecord; audit: AuditEntry[]; summary: CdsMatchSummary } {
+export function matchCdsToJournal(review: ReviewRecord, user: AppUser, opts: { updateConfirmed?: boolean } = {}): { review: ReviewRecord; audit: AuditEntry[]; summary: CdsMatchSummary } {
   const v = latestJournal(review)?.version ?? 1;
   let r = review;
   const entries: AuditEntry[] = [];
@@ -170,6 +170,8 @@ export function matchCdsToJournal(review: ReviewRecord, user: AppUser): { review
     if (c.status === 'Ready for Review' && c.suggestedResponse.trim()) {
       const same = d && d.status !== 'rejected' && d.value.trim() === c.suggestedResponse.trim();
       if (same) continue;
+      // A confirmed answer is only replaced when the case manager asked for it explicitly.
+      if (d && d.status !== 'rejected' && opts.updateConfirmed === false) continue;
       const res = applyDecision(user, r, 'cds', c.fieldId, {
         status: 'approved', value: c.suggestedResponse, originalValue: c.suggestedResponse,
         note: d ? `Updated to match the final journal v${v} (was: ${d.value})` : `Filled from the final journal v${v}`,

@@ -1,45 +1,15 @@
 // "Copy to WellSky": the final approved journal entry and the confirmed CDS answers, ready to paste.
 // Only answers the case manager confirmed are offered for entry; everything else is listed as not ready.
 import clsx from 'clsx';
-import { Check, CheckCircle2, Copy, Loader2, RefreshCw } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
 import { useApp } from '../../app/AppContext.tsx';
 import type { CdsResponse } from '../../engine/types.ts';
 import type { ReviewRecord } from '../../data/types.ts';
 import { cdsJournalGaps, latestJournal, matchCdsToJournal } from '../../workflow/engine.ts';
 import { useIndependentQa } from './workflow-tabs.tsx';
 
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // Fallback for browsers or frames where the clipboard API is blocked.
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    let ok = false;
-    try { ok = document.execCommand('copy'); } catch { ok = false; }
-    document.body.removeChild(ta);
-    return ok;
-  }
-}
-
-function CopyButton({ text, label = 'Copy', big }: { text: string; label?: string; big?: boolean }) {
-  const [state, setState] = useState<'idle' | 'done' | 'fail'>('idle');
-  return (
-    <button type="button" onClick={async () => { setState((await copyText(text)) ? 'done' : 'fail'); setTimeout(() => setState('idle'), 2000); }}
-      className={clsx('inline-flex shrink-0 items-center gap-1.5 font-mono', big ? 'bg-navy-700 px-4 py-3 text-sm text-white hover:bg-navy-900' : 'border-[1.5px] border-slate-900 bg-white px-3 py-2 text-xs hover:bg-slate-100')}
-      aria-label={label}>
-      {state === 'done' ? <Check size={14} /> : <Copy size={14} />}
-      {state === 'done' ? 'Copied' : state === 'fail' ? 'Select & copy' : label}
-    </button>
-  );
-}
+import { CopyButton } from './copy.tsx';
 
 interface Answer { c: CdsResponse; value: string }
 
@@ -57,14 +27,6 @@ export function WellskyTab({ review, goTo }: { review: ReviewRecord; goTo: (tab:
     setSyncing(true); setSyncError('');
     try { const m = matchCdsToJournal(review, user); await persist(m.review, m.audit); } catch (e) { setSyncError((e as Error).message); } finally { setSyncing(false); }
   };
-  // When the journal is final (no open findings), fill the CDS from it automatically so both records match.
-  const autoRan = useRef(false);
-  useEffect(() => {
-    if (autoRan.current || !user || gaps.total === 0 || qa.openFindings.length > 0) return;
-    autoRan.current = true;
-    void sync();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gaps.total, qa.openFindings.length, user]);
   const match = review.workflow?.cdsMatch;
   const journalText = journal?.text ?? '';
 

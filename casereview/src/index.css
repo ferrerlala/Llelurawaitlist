@@ -7,7 +7,7 @@
 @import "@fontsource/ibm-plex-mono/latin-500.css";
 @import "tailwindcss";
 
-/* System Lab design: ink + paper neutrals, one signal-blue accent, square corners, mono labels. */
+/* Clean healthcare design: white surfaces, dark navy text, one blue accent, square corners. */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -15,29 +15,29 @@
 
   /* "navy" = the accent family: dark steps are ink, mid steps are signal blue */
   --color-navy-50: #eef2fd;
-  --color-navy-100: #e6e8e3;
-  --color-navy-200: #b8bcb6;
-  --color-navy-300: #9a9f99;
+  --color-navy-100: #dfe6f2;
+  --color-navy-200: #b4c2d9;
+  --color-navy-300: #8ea0bf;
   --color-navy-400: #5f7fea;
   --color-navy-500: #3a61e0;
   --color-navy-600: #2a55dc;
   --color-navy-700: #1f4bd8;
   --color-navy-800: #1f4bd8;
   --color-navy-900: #16379e;
-  --color-navy-950: #111312;
+  --color-navy-950: #13233f;
 
   /* "slate" = paper-to-ink neutrals */
-  --color-slate-50: #f4f5f2;
-  --color-slate-100: #eceeea;
-  --color-slate-200: #d9dcd6;
-  --color-slate-300: #b8bcb6;
-  --color-slate-400: #8a8f8a;
-  --color-slate-500: #5b605c;
-  --color-slate-600: #4a4e4b;
-  --color-slate-700: #3a3d3b;
-  --color-slate-800: #232624;
-  --color-slate-900: #111312;
-  --color-slate-950: #0a0b0a;
+  --color-slate-50: #f6f7f9;
+  --color-slate-100: #eef1f5;
+  --color-slate-200: #dde2ea;
+  --color-slate-300: #bcc5d3;
+  --color-slate-400: #8793a6;
+  --color-slate-500: #556178;
+  --color-slate-600: #45516a;
+  --color-slate-700: #334058;
+  --color-slate-800: #1f2c45;
+  --color-slate-900: #13233f;
+  --color-slate-950: #0b1528;
 
   --radius-xs: 0px;
   --radius-sm: 0px;
@@ -47,15 +47,13 @@
   --radius-2xl: 0px;
   --shadow-sm: none;
   --shadow: none;
-  --shadow-md: 0 0 0 1px #d9dcd6;
-  --shadow-lg: 0 0 0 1.5px #111312;
+  --shadow-md: 0 0 0 1px #dde2ea;
+  --shadow-lg: 0 0 0 1.5px #13233f;
 }
 
 html, body {
-  background-color: #f4f5f2;
-  background-image: linear-gradient(#e6e8e3 1px, transparent 1px), linear-gradient(90deg, #e6e8e3 1px, transparent 1px);
-  background-size: 24px 24px;
-  color: #111312;
+  background-color: #f6f7f9;
+  color: #13233f;
 }
 body { -webkit-font-smoothing: antialiased; }
 
@@ -63,7 +61,7 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
 h1 { font-weight: 600; }
 
 /* Small uppercase labels, badges and tables headers read as instrument labels */
-.uppercase, th { font-family: var(--font-mono); letter-spacing: 0.06em; }
+.uppercase, th { letter-spacing: 0.04em; }
 input, select, textarea { border-radius: 0 !important; }
 button { border-radius: 0; }
 .rounded-full { border-radius: 0; }

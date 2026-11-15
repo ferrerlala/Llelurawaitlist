@@ -91,7 +91,7 @@ function ReviewView({ review, tab, setTab }: { review: ReviewRecord; tab: Review
   }
   return (
     <EvidenceProvider documents={review.input.documents}>
-      {review.workflow && <button type="button" onClick={() => setTab('guide')} className="no-print mb-3 border-[1.5px] border-slate-900 bg-white px-4 py-2 font-mono text-sm hover:bg-slate-100">← Back to the simple guide</button>}
+      {review.workflow && <button type="button" onClick={() => setTab('guide')} className="no-print mb-3 border-[1.5px] border-slate-900 bg-white px-4 py-2 font-mono text-sm hover:bg-slate-100">← Back to case steps</button>}
       <PageHeader
         title={`Case ${review.input.caseIdentifier}`}
         description={<span>{review.input.assessmentType} · {review.input.assessmentDate || 'date not entered'} · {review.input.program || 'program not entered'} · {review.input.documents.length} document(s)</span>}

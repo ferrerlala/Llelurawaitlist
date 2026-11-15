@@ -1,6 +1,11 @@
 import clsx from 'clsx';
-import { ArrowLeft, CheckCircle2, FileCheck2, Loader2, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ArrowLeft, CheckCircle2, FileCheck2, FileUp, Loader2, Sparkles, Trash2 } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { DOCUMENT_TYPES, type DocumentType, type SourceDocument } from '@shared/extraction-contract.ts';
+import { newId } from '../data/repository.ts';
+import { ACCEPTED_FILE_TYPES, extractTextFromFile } from '../lib/document-text.ts';
+import { CaseProgress } from '../components/review/progress.tsx';
+import { CopyButton } from '../components/review/copy.tsx';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../app/AppContext.tsx';
 import { useAnalyzer } from '../app/use-analyzer.ts';
@@ -18,6 +23,16 @@ const STATE_TONE: Record<string, 'green' | 'amber' | 'red' | 'blue' | 'slate' | 
 const STATE_LABEL: Record<string, string> = {
   new: 'New', changed: 'Changed', confirmed: 'Unchanged – confirmed', 'carried-flagged': 'Carried forward – check', clarify: 'Needs clarification', omitted: 'Omitted (optional)', auto: 'Filled automatically',
 };
+
+function guessSupportingType(name: string): DocumentType {
+  const n = name.toLowerCase();
+  if (/cds/.test(n)) return 'CDS Record';
+  if (/risk/.test(n)) return 'Risk Worksheet';
+  if (/financial|worksheet/.test(n)) return 'Financial Worksheet';
+  if (/consent|disclosure/.test(n)) return 'Applicant Consent and Disclosure';
+  if (/suspen/.test(n)) return 'Service Suspension Record';
+  return 'Other Supporting Document';
+}
 
 function previousJournalText(r: ReviewRecord): string {
   return latestJournal(r)?.text ?? r.input.documents.filter((d) => d.type === 'Narrative / Journal Note').map((d) => d.text).join('\n') ?? '';
@@ -41,12 +56,44 @@ export function StartAnnualAssessmentPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const analyze = useAnalyzer(null, attest);
+  const [uploadedPrev, setUploadedPrev] = useState<string | null>(null);
+  const [supporting, setSupporting] = useState<SourceDocument[]>([]);
+  const [uploadMsg, setUploadMsg] = useState('');
+  const prevRef = useRef<HTMLInputElement>(null);
+  const docsRef = useRef<HTMLInputElement>(null);
+
+  const onPrevFile = async (files: FileList | null) => {
+    const f = files?.[0];
+    if (!f) return;
+    setUploadMsg('');
+    try {
+      const text = await extractTextFromFile(f);
+      setPrevText(text);
+      setUploadedPrev(f.name);
+      setPrevMeta({ id: null, date: null, label: `Uploaded previous assessment: ${f.name}` });
+    } catch (e) { setUploadMsg((e as Error).message); }
+    if (prevRef.current) prevRef.current.value = '';
+  };
+  const onSupportingFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploadMsg('');
+    const added: SourceDocument[] = [];
+    const errors: string[] = [];
+    for (const f of Array.from(files)) {
+      try { added.push({ id: newId('doc'), name: f.name, type: guessSupportingType(f.name), text: await extractTextFromFile(f) }); }
+      catch (e) { errors.push((e as Error).message); }
+    }
+    setSupporting((d) => [...d, ...added]);
+    if (errors.length) setUploadMsg(errors.join(' '));
+    if (docsRef.current) docsRef.current.value = '';
+  };
 
   const caseIds = useMemo(() => [...new Set(reviews.map((r) => r.input.caseIdentifier))].sort(), [reviews]);
   const previous = useMemo(() => previousValues(template, prevText), [template, prevText]);
 
   const retrieve = () => {
     setError('');
+    if (uploadedPrev && prevText) { setInputs({}); setStep(2); return; }
     const prior = reviews
       .filter((r) => r.input.caseIdentifier === caseId.trim() && (!assessmentDate || !r.input.assessmentDate || r.input.assessmentDate < assessmentDate))
       .sort((a, b) => (b.input.assessmentDate || b.createdAt).localeCompare(a.input.assessmentDate || a.createdAt))[0];
@@ -95,6 +142,7 @@ export function StartAnnualAssessmentPage() {
       const { review, audit } = await approveJournal({
         user, analyze, caseIdentifier: caseId.trim(), assessmentType, assessmentDate, program, journalText, inputs, draftFields: draft.fields, template,
         previousReviewId: prevMeta?.id ?? null, previousAssessmentDate: prevMeta?.date ?? null,
+        supportingDocuments: supporting,
       });
       await persist({ ...review, workflow: { ...review.workflow!, aiAttested: attest } }, audit);
       navigate(`/reviews/${review.id}?tab=guide`);
@@ -114,9 +162,12 @@ export function StartAnnualAssessmentPage() {
         description="Previous assessment + new changes → annual journal draft → your approval → automatic CDS preparation, consistency validation and independent QA."
         actions={step === 1 && <Button onClick={loadExample}><Sparkles size={15} /> Load fictional example (Nov 12, 2026)</Button>}
       />
-      <ol className="mb-5 flex flex-wrap gap-2 text-xs">
-        {['1. Select case', '2. Review previous & enter changes', '3. Edit & approve journal'].map((s, i) => (
-          <li key={s} className={clsx('rounded-full px-3 py-1 font-medium ring-1', step === i + 1 ? 'bg-navy-800 text-white ring-navy-800' : step > i + 1 ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : 'bg-white text-slate-500 ring-slate-200')}>{s}</li>
+      <div className="mb-4"><CaseProgress active={step === 3 ? 'journal' : 'assessment'} complete={{ assessment: step === 3 }} /></div>
+      <ol className="mb-5 grid gap-2 sm:grid-cols-3">
+        {['Start assessment', 'Update information', 'Generate annual journal'].map((label, i) => (
+          <li key={label} className={clsx('border px-3 py-2 text-sm', step === i + 1 ? 'border-slate-900 bg-white font-semibold' : step > i + 1 ? 'border-emerald-200 bg-white text-emerald-800' : 'border-slate-200 bg-white text-slate-500')}>
+            <span className="mr-1.5 text-xs text-slate-500">Part {i + 1}</span>{label}{step > i + 1 && ' ✓'}
+          </li>
         ))}
       </ol>
 
@@ -132,8 +183,50 @@ export function StartAnnualAssessmentPage() {
             <div><Label htmlFor="at">Assessment type</Label><Select id="at" value={assessmentType} onChange={(e) => setAssessmentType(e.target.value as AssessmentType)}>{ASSESSMENT_TYPES.map((t) => <option key={t}>{t}</option>)}</Select></div>
             <div><Label htmlFor="pg">Program</Label><Input id="pg" value={program} onChange={(e) => setProgram(e.target.value)} /></div>
           </div>
-          <div className="mt-4 flex justify-end"><Button variant="primary" disabled={!caseId.trim() || !assessmentDate} onClick={retrieve}>Retrieve previous assessment</Button></div>
-          <p className="mt-2 text-xs text-slate-500">Previous assessments are retrieved only from reviews stored in this application for your organization.</p>
+          <p className="mt-2 text-xs text-slate-500">Use the internal case ID only. Never enter the consumer's name.</p>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="border border-slate-200 p-4">
+              <p className="font-semibold">Previous assessment</p>
+              <p className="mt-1 text-sm text-slate-600">If this case is already in the app, the last assessment is found automatically. Or upload it (PDF, Word or text).</p>
+              <input ref={prevRef} type="file" accept={ACCEPTED_FILE_TYPES} className="hidden" onChange={(e) => onPrevFile(e.target.files)} />
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button onClick={() => prevRef.current?.click()}><FileUp size={15} /> Upload previous assessment</Button>
+                {uploadedPrev && <Button variant="ghost" onClick={() => { setUploadedPrev(null); setPrevText(null); setPrevMeta(null); }}><Trash2 size={14} /> Remove</Button>}
+              </div>
+              {uploadedPrev && prevText && (() => {
+                const found = template.fields.filter((f) => previous[f.id]?.text);
+                return (
+                  <div className="mt-3 bg-slate-50 p-3 text-sm">
+                    <p><b>{uploadedPrev}</b> — found {found.length} of {template.fields.length} journal items.</p>
+                    <p className="mt-1 text-xs text-slate-600">{found.slice(0, 12).map((f) => f.label).join(' · ')}{found.length > 12 ? ' …' : ''}</p>
+                    <p className="mt-1 text-xs text-slate-600">You will review every item in the next part.</p>
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="border border-slate-200 p-4">
+              <p className="font-semibold">Supporting documents <span className="font-normal text-slate-500">(optional)</span></p>
+              <p className="mt-1 text-sm text-slate-600">Financial worksheet, consent forms, risk worksheet, CDS record. They are used in the checks.</p>
+              <input ref={docsRef} type="file" multiple accept={ACCEPTED_FILE_TYPES} className="hidden" onChange={(e) => onSupportingFiles(e.target.files)} />
+              <div className="mt-3"><Button onClick={() => docsRef.current?.click()}><FileUp size={15} /> Upload documents</Button></div>
+              {supporting.length > 0 && (
+                <ul className="mt-3 space-y-2 text-sm">
+                  {supporting.map((d) => (
+                    <li key={d.id} className="flex flex-wrap items-center gap-2 bg-slate-50 p-2">
+                      <span className="min-w-0 flex-1 truncate font-medium">{d.name}</span>
+                      <Select aria-label={`Document type for ${d.name}`} value={d.type} onChange={(e) => setSupporting((x) => x.map((y) => (y.id === d.id ? { ...y, type: e.target.value as DocumentType } : y)))} className="!w-auto">
+                        {DOCUMENT_TYPES.filter((t) => t !== 'Narrative / Journal Note').map((t) => <option key={t}>{t}</option>)}
+                      </Select>
+                      <button type="button" aria-label={`Remove ${d.name}`} onClick={() => setSupporting((x) => x.filter((y) => y.id !== d.id))} className="p-1 text-slate-500 hover:text-red-700"><Trash2 size={15} /></button>
+                      <span className="w-full text-xs text-slate-500">{d.text.trim().split(/\s+/).length} words extracted</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          {uploadMsg && <Notice tone="red" className="mt-3">{uploadMsg}</Notice>}
+          <div className="mt-4 flex justify-end"><Button variant="primary" disabled={!caseId.trim() || !assessmentDate} onClick={retrieve}>Continue: update information</Button></div>
         </Card>
       )}
 
@@ -207,6 +300,7 @@ export function StartAnnualAssessmentPage() {
             <Notice tone="blue" title="Draft prepared by rule-based assembly">
               Each line is your entry, a previous line you confirmed, or a clarification marker. No medical, service, financial or eligibility information is generated. Edit anything below before approving.
             </Notice>
+            <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm text-slate-600">Edit the journal below. New information and changes are listed on the right.</p><CopyButton text={journalText} label="Copy journal" /></div>
             <TextArea rows={40} className="font-mono text-[12.5px] leading-relaxed" value={journalText} onChange={(e) => setJournalText(e.target.value)} aria-label="Annual journal" />
             {problems.map((p) => <Notice key={p} tone={/CLARIFY|clarification/.test(p) ? 'red' : 'amber'}>{p}</Notice>)}
             {settings.aiMode === 'claude' && (

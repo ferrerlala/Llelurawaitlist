@@ -39,6 +39,6 @@ export async function applyProposals(
     r = res.review; entries.push(...res.audit); applied++;
   }
   onProgress?.('Filling the CDS from the final journal');
-  const m = matchCdsToJournal(r, user);
+  const m = matchCdsToJournal(r, user, { updateConfirmed: false });
   return { review: m.review, audit: [...entries, ...m.audit], applied, cds: m.summary };
 }

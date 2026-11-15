@@ -90,7 +90,7 @@ export function AssistantPanel({ review, onDone, embedded }: { review: ReviewRec
     ) : null;
     return (
       <section className="flex flex-wrap items-center gap-4 border-[1.5px] border-navy-700 bg-white p-5">
-        <p className="min-w-0 flex-1 text-base"><b>{gaps.total} CDS answer(s)</b> don't follow the final journal yet.</p>
+        <p className="min-w-0 flex-1 basis-64 text-base"><b>{gaps.total} CDS answer(s)</b> don't follow the final journal yet.</p>
         <button type="button" disabled={busy} onClick={fillOnly} className="bg-navy-700 px-5 py-3 font-mono text-sm text-white hover:bg-navy-900">Fill the CDS from the journal</button>
       </section>
     );
@@ -202,7 +202,7 @@ export function AssistantPanel({ review, onDone, embedded }: { review: ReviewRec
           {busy ? 'Working…' : `Approve ${approved.length} fix(es)`}
         </button>
         {busy ? <span className="flex items-center gap-2 text-sm text-slate-600"><Loader2 size={15} className="animate-spin" /> {progress}</span>
-          : <span className="text-sm text-slate-600">Unticked items are skipped. Every change is saved in the history.</span>}
+          : <span className="text-sm text-slate-600">Unticked items are skipped. After the fixes, CDS answers that come straight from the journal are confirmed. Answers you already confirmed are not changed.</span>}
         {error && <p className="w-full text-sm text-red-700">{error}</p>}
       </div>
     </section>
