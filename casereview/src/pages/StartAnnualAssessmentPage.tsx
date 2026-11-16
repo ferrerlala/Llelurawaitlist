@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { ArrowLeft, CheckCircle2, FileCheck2, FileUp, Loader2, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ClipboardPaste, FileCheck2, FileUp, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { DOCUMENT_TYPES, type DocumentType, type SourceDocument } from '@shared/extraction-contract.ts';
 import { newId } from '../data/repository.ts';
@@ -59,6 +59,15 @@ export function StartAnnualAssessmentPage() {
   const [uploadedPrev, setUploadedPrev] = useState<string | null>(null);
   const [supporting, setSupporting] = useState<SourceDocument[]>([]);
   const [uploadMsg, setUploadMsg] = useState('');
+  const [pasting, setPasting] = useState(false);
+  const [pasted, setPasted] = useState('');
+  const usePasted = () => {
+    if (!pasted.trim()) return;
+    setPrevText(pasted);
+    setUploadedPrev('Pasted text');
+    setPrevMeta({ id: null, date: null, label: 'Previous assessment pasted by the case manager' });
+    setPasting(false);
+  };
   const prevRef = useRef<HTMLInputElement>(null);
   const docsRef = useRef<HTMLInputElement>(null);
 
@@ -187,12 +196,23 @@ export function StartAnnualAssessmentPage() {
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <div className="border border-slate-200 p-4">
               <p className="font-semibold">Previous assessment</p>
-              <p className="mt-1 text-sm text-slate-600">If this case is already in the app, the last assessment is found automatically. Or upload it (PDF, Word or text).</p>
+              <p className="mt-1 text-sm text-slate-600">If this case is already in the app, the last assessment is found automatically. Or upload it (PDF, Word or text), or copy and paste it.</p>
               <input ref={prevRef} type="file" accept={ACCEPTED_FILE_TYPES} className="hidden" onChange={(e) => onPrevFile(e.target.files)} />
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Button onClick={() => prevRef.current?.click()}><FileUp size={15} /> Upload previous assessment</Button>
-                {uploadedPrev && <Button variant="ghost" onClick={() => { setUploadedPrev(null); setPrevText(null); setPrevMeta(null); }}><Trash2 size={14} /> Remove</Button>}
+                <Button onClick={() => { setPasting(true); setPasted(uploadedPrev === 'Pasted text' ? prevText ?? '' : ''); }}><ClipboardPaste size={15} /> Paste text</Button>
+                {uploadedPrev && <Button variant="ghost" onClick={() => { setUploadedPrev(null); setPrevText(null); setPrevMeta(null); setPasted(''); }}><Trash2 size={14} /> Remove</Button>}
               </div>
+              {pasting && (
+                <div className="mt-3 space-y-2">
+                  <Label htmlFor="paste-prev">Paste the previous assessment or journal</Label>
+                  <TextArea id="paste-prev" rows={10} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="Paste here. Remove the consumer's name and other identifying details first." />
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="primary" disabled={!pasted.trim()} onClick={usePasted}>Use this text</Button>
+                    <Button variant="ghost" onClick={() => setPasting(false)}>Cancel</Button>
+                  </div>
+                </div>
+              )}
               {uploadedPrev && prevText && (() => {
                 const found = template.fields.filter((f) => previous[f.id]?.text);
                 return (
