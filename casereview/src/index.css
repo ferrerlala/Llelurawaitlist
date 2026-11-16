@@ -77,3 +77,8 @@ mark.evidence { background: #fde68a; padding: 0 2px; border-radius: 2px; }
   tr { break-inside: avoid; }
   @page { margin: 14mm; }
 }
+
+/* iPhone zooms into text boxes with text under 16px; keep them at 16px on small screens. */
+@media (max-width: 640px) {
+  input, select, textarea { font-size: 16px !important; }
+}

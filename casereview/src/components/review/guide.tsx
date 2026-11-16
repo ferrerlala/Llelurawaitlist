@@ -12,6 +12,8 @@ import { cdsRows, confirmedCdsText, groupBySection, notInJournalCount, type Evid
 import { approveFinal, cdsJournalGaps, finalApprovalValid, latestJournal, matchCdsToJournal, reviseJournal } from '../../workflow/engine.ts';
 import { Badge, Notice, TextArea } from '../ui.tsx';
 import { AssistantPanel } from './assistant-panel.tsx';
+import { WordingPanel } from './wording-panel.tsx';
+import { journalTemplateFor } from '../../config/journal-template.ts';
 import { CopyButton, cleanText, journalSections } from './copy.tsx';
 import { CaseProgress, type CaseStep } from './progress.tsx';
 import { useBaselineScore } from './results-tab.tsx';
@@ -127,9 +129,19 @@ function AssessmentStep({ review }: { review: ReviewRecord }) {
 
 // ---------------------------------------------------------------- 2. Journal
 function JournalStep({ review, onDone }: { review: ReviewRecord; onDone: (m: string) => void }) {
-  const { user, persist } = useApp();
+  const { user, persist, settings } = useApp();
   const analyze = useAnalyzer(review);
   const v = latestJournal(review)!;
+  const [polishing, setPolishing] = useState(false);
+  const applyWording = async (newText: string, count: number) => {
+    if (!user) return;
+    setPolishing(true); setError('');
+    try {
+      const res = await reviseJournal(review, newText, `Professional wording applied to ${count} line(s)`, user, analyze);
+      await persist(res.review, res.audit);
+      onDone(`New wording saved as journal version ${v.version + 1}. The CDS answers and checks were updated from it.`);
+    } catch (e) { setError((e as Error).message); } finally { setPolishing(false); }
+  };
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(v.text);
   const [reason, setReason] = useState('');
@@ -155,6 +167,8 @@ function JournalStep({ review, onDone }: { review: ReviewRecord; onDone: (m: str
       <StepHeader n={2} title="Journal" text={<>Your approved journal in the agency format for this assessment type. Sections with new information are marked <span className="bg-navy-50 px-1 text-navy-800">New</span>. Edit it here, or copy it into WellSky.</>}
         actions={!editing && <><button type="button" onClick={() => { setText(v.text); setEditing(true); }} className="inline-flex items-center gap-1.5 border border-slate-300 bg-white px-4 py-3 text-sm font-medium hover:bg-slate-50"><Pencil size={14} /> Edit journal</button><CopyButton text={v.text} label="Copy journal" big /></>} />
       <p className="text-sm text-slate-600">Version {v.version} · approved by {v.approvedByName} on {new Date(v.approvedAt).toLocaleString()}</p>
+      {!editing && <WordingPanel text={v.text} template={journalTemplateFor(settings, review.input.assessmentType)} onApply={applyWording} busy={polishing} applyLabel="Save the new wording" />}
+      {error && !editing && <Notice tone="red">{error}</Notice>}
       {editing ? (
         <Panel title="Edit journal">
           <div className="space-y-3 p-4">

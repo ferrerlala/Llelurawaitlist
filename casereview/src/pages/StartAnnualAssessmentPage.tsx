@@ -6,6 +6,7 @@ import { newId } from '../data/repository.ts';
 import { ACCEPTED_FILE_TYPES, extractTextFromFile } from '../lib/document-text.ts';
 import { CaseProgress } from '../components/review/progress.tsx';
 import { CopyButton } from '../components/review/copy.tsx';
+import { WordingPanel } from '../components/review/wording-panel.tsx';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../app/AppContext.tsx';
 import { useAnalyzer } from '../app/use-analyzer.ts';
@@ -168,7 +169,7 @@ export function StartAnnualAssessmentPage() {
         supportingDocuments: supporting,
       });
       await persist({ ...review, workflow: { ...review.workflow!, aiAttested: attest } }, audit);
-      navigate(`/reviews/${review.id}?tab=guide`);
+      navigate(`/reviews/${review.id}?tab=guide&step=cds`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -338,10 +339,11 @@ export function StartAnnualAssessmentPage() {
       {step === 3 && draft && (
         <div className="grid gap-5 xl:grid-cols-[3fr_2fr]">
           <div className="space-y-3">
-            <Notice tone="blue" title="Draft prepared by rule-based assembly">
-              Each line is your entry, a previous line you confirmed, or a clarification marker. No medical, service, financial or eligibility information is generated. Edit anything below before approving.
+            <Notice tone="blue" title="Your journal draft">
+              Each line is your entry, a previous line you confirmed, or a marker to fill in. Nothing new is made up. Improve the wording, edit anything, then approve.
             </Notice>
-            <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm text-slate-600">Edit the journal below. New information and changes are listed on the right.</p><CopyButton text={journalText} label="Copy journal" /></div>
+            <WordingPanel text={journalText} template={template} onApply={(t) => setJournalText(t)} />
+            <div className="flex flex-wrap items-center justify-between gap-2"><p className="min-w-0 flex-1 basis-56 text-sm text-slate-600">Edit the journal below. When it reads well, press <b>Approve journal &amp; prepare CDS</b> — the CDS is filled from it.</p><CopyButton text={journalText} label="Copy journal" /></div>
             <TextArea rows={40} className="font-mono text-[12.5px] leading-relaxed" value={journalText} onChange={(e) => setJournalText(e.target.value)} aria-label="Annual journal" />
             {problems.map((p) => <Notice key={p} tone={/CLARIFY|clarification/.test(p) ? 'red' : 'amber'}>{p}</Notice>)}
             {settings.aiMode === 'claude' && (
