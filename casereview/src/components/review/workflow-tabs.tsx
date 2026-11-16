@@ -11,6 +11,7 @@ import { isOpen, runIndependentQa, type IndependentQaResult } from '../../workfl
 import type { ConsistencyFinding } from '../../workflow/types.ts';
 import { Badge, Button, Card, Collapsible, EmptyState, Input, Notice, Select, Table, Td, TextArea, Th } from '../ui.tsx';
 import { EvidenceButton } from './EvidencePanel.tsx';
+import { journalTemplateFor } from '../../config/journal-template.ts';
 
 export function useIndependentQa(review: ReviewRecord): IndependentQaResult {
   const { settings } = useApp();
@@ -194,7 +195,7 @@ export function JournalTab({ review }: { review: ReviewRecord }) {
             </ul>
           </Card>
         )}
-        <p className="text-xs text-slate-500">Template: {settings.journalTemplate.name} v{settings.journalTemplate.version}</p>
+        <p className="text-xs text-slate-500">Template: {journalTemplateFor(settings, review.input.assessmentType).name} v{journalTemplateFor(settings, review.input.assessmentType).version}</p>
       </div>
     </div>
   );
@@ -223,7 +224,7 @@ export function FixIssuesTab({ review }: { review: ReviewRecord }) {
   const [view, setView] = useState<'open' | 'all' | 'closed'>('open');
   const states = review.workflow!.findingStates;
   const list = view === 'open' ? qa.openFindings : view === 'closed' ? [] : qa.findings;
-  const act = (f: ConsistencyFinding, action: FindingAction) => user && m.run(() => applyFindingAction(review, f, action, user, analyze, settings.journalTemplate));
+  const act = (f: ConsistencyFinding, action: FindingAction) => user && m.run(() => applyFindingAction(review, f, action, user, analyze, journalTemplateFor(settings, review.input.assessmentType)));
   const ready = review.analysis.cds.filter((c) => c.mapped && c.status === 'Ready for Review' && !review.decisions[`cds:${c.fieldId}`]);
 
   return (
@@ -278,7 +279,7 @@ export function FixIssuesTab({ review }: { review: ReviewRecord }) {
 
 function FindingCard({ finding: f, review, open, busy, onAct }: { finding: ConsistencyFinding; review: ReviewRecord; open: boolean; busy: boolean; onAct: (a: FindingAction) => void }) {
   const { settings } = useApp();
-  const field = settings.journalTemplate.fields.find((x) => x.id === f.journalFieldId);
+  const field = journalTemplateFor(settings, review.input.assessmentType).fields.find((x) => x.id === f.journalFieldId);
   const current = field ? readJournalField(latestJournal(review)!.text, field) ?? '' : '';
   const [mode, setMode] = useState<'none' | 'info' | 'answer' | 'attest' | 'reject' | 'unable'>('none');
   const [text, setText] = useState('');

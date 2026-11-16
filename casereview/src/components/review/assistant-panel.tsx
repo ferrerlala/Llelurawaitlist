@@ -12,6 +12,7 @@ import { applyProposals } from '../../workflow/apply-proposals.ts';
 import { cdsJournalGaps, latestJournal, matchCdsToJournal } from '../../workflow/engine.ts';
 import { readJournalField } from '../../workflow/journal-builder.ts';
 import { useIndependentQa } from './workflow-tabs.tsx';
+import { journalTemplateFor } from '../../config/journal-template.ts';
 
 const CHIP: Record<Confidence, { label: string; cls: string }> = {
   journal: { label: 'From the journal', cls: 'bg-emerald-700 text-white' },
@@ -38,7 +39,7 @@ export function useProposals(review: ReviewRecord): AiProposal[] {
     const date = review.input.assessmentDate ? new Date(`${review.input.assessmentDate}T12:00:00`).toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US');
     return buildProposals({
       findings: qa.openFindings, cdsChecks, recordCds, journal, date,
-      readField: (id) => { const f = settings.journalTemplate.fields.find((x) => x.id === id); return f ? readJournalField(journal, f) ?? '' : ''; },
+      readField: (id) => { const f = journalTemplateFor(settings, review.input.assessmentType).fields.find((x) => x.id === id); return f ? readJournalField(journal, f) ?? '' : ''; },
     });
   }, [review, qa, settings]);
 }

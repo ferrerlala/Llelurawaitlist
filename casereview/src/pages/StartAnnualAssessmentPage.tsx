@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../app/AppContext.tsx';
 import { useAnalyzer } from '../app/use-analyzer.ts';
 import { Badge, Button, Card, Input, Label, Notice, PageHeader, Select, TextArea } from '../components/ui.tsx';
-import { JOURNAL_SECTIONS } from '../config/journal-template.ts';
+import { JOURNAL_SECTIONS, journalTemplateFor } from '../config/journal-template.ts';
 import { SAMPLE_ANNUAL_CHANGES, SAMPLE_PREVIOUS_JOURNAL } from '../config/sample-data.ts';
 import { ASSESSMENT_TYPES, type AssessmentType } from '../engine/types.ts';
 import { approveJournal, latestJournal } from '../workflow/engine.ts';
@@ -41,12 +41,13 @@ function previousJournalText(r: ReviewRecord): string {
 export function StartAnnualAssessmentPage() {
   const { user, settings, reviews, persist } = useApp();
   const navigate = useNavigate();
-  const template = settings.journalTemplate;
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [caseId, setCaseId] = useState('');
   const [assessmentDate, setAssessmentDate] = useState('');
   const [assessmentType, setAssessmentType] = useState<AssessmentType>('Annual Redetermination');
   const [program, setProgram] = useState('');
+  // The journal format follows the assessment type: six-month reassessments use the shorter format.
+  const template = journalTemplateFor(settings, assessmentType);
   const [prevText, setPrevText] = useState<string | null>(null);
   const [prevMeta, setPrevMeta] = useState<{ id: string | null; date: string | null; label: string } | null>(null);
   const [inputs, setInputs] = useState<Record<string, JournalFieldInput>>({});
@@ -100,21 +101,34 @@ export function StartAnnualAssessmentPage() {
   const caseIds = useMemo(() => [...new Set(reviews.map((r) => r.input.caseIdentifier))].sort(), [reviews]);
   const previous = useMemo(() => previousValues(template, prevText), [template, prevText]);
 
+  /** Pre-fill every item that has previous text as "Unchanged" so the case manager only changes what is different. */
+  const prefillFrom = (text: string | null) => {
+    const prevVals = previousValues(template, text);
+    setInputs(Object.fromEntries(template.fields.filter((f) => f.id !== 'assessment_date' && prevVals[f.id]?.text).map((f) => {
+      // Visit items (people present, observations, dates) are copied as text for the case manager to update.
+      const visit = f.unchanged === 'clarify' || f.unchanged === 'never';
+      return [f.id, visit
+        ? { fieldId: f.id, status: 'changed' as FieldReviewStatus, newText: prevVals[f.id].text!.trim(), note: '', fromPrevious: true }
+        : { fieldId: f.id, status: 'unchanged' as FieldReviewStatus, newText: '', note: '' }];
+    })));
+  };
+
   const retrieve = () => {
     setError('');
-    if (uploadedPrev && prevText) { setInputs({}); setStep(2); return; }
+    if (uploadedPrev && prevText) { prefillFrom(prevText); setStep(2); return; }
     const prior = reviews
       .filter((r) => r.input.caseIdentifier === caseId.trim() && (!assessmentDate || !r.input.assessmentDate || r.input.assessmentDate < assessmentDate))
       .sort((a, b) => (b.input.assessmentDate || b.createdAt).localeCompare(a.input.assessmentDate || a.createdAt))[0];
     if (prior) {
       setPrevText(previousJournalText(prior));
+      prefillFrom(previousJournalText(prior));
       setPrevMeta({ id: prior.id, date: prior.input.assessmentDate || null, label: `${prior.input.assessmentType} ${prior.input.assessmentDate || ''} (${prior.workflow ? `journal v${latestJournal(prior)?.version}` : 'narrative review'})` });
       if (!program) setProgram(prior.input.program);
     } else {
       setPrevText(null);
       setPrevMeta({ id: null, date: null, label: 'No previous assessment on file for this case in this application' });
+      setInputs({});
     }
-    setInputs({});
     setStep(2);
   };
 
@@ -167,13 +181,13 @@ export function StartAnnualAssessmentPage() {
   return (
     <>
       <PageHeader
-        title="Start Annual Assessment"
-        description="Previous assessment + new changes → annual journal draft → your approval → automatic CDS preparation, consistency validation and independent QA."
+        title="Start Assessment"
+        description="Annual or 6-month: previous assessment + what changed → journal in the right format → your approval → CDS, checks and QA."
         actions={step === 1 && <Button onClick={loadExample}><Sparkles size={15} /> Load fictional example (Nov 12, 2026)</Button>}
       />
       <div className="mb-4"><CaseProgress active={step === 3 ? 'journal' : 'assessment'} complete={{ assessment: step === 3 }} /></div>
       <ol className="mb-5 grid gap-2 sm:grid-cols-3">
-        {['Start assessment', 'Update information', 'Generate annual journal'].map((label, i) => (
+        {['Start assessment', 'Update information', 'Generate journal'].map((label, i) => (
           <li key={label} className={clsx('border px-3 py-2 text-sm', step === i + 1 ? 'border-slate-900 bg-white font-semibold' : step > i + 1 ? 'border-emerald-200 bg-white text-emerald-800' : 'border-slate-200 bg-white text-slate-500')}>
             <span className="mr-1.5 text-xs text-slate-500">Part {i + 1}</span>{label}{step > i + 1 && ' ✓'}
           </li>
@@ -193,6 +207,7 @@ export function StartAnnualAssessmentPage() {
             <div><Label htmlFor="pg">Program</Label><Input id="pg" value={program} onChange={(e) => setProgram(e.target.value)} /></div>
           </div>
           <p className="mt-2 text-xs text-slate-500">Use the internal case ID only. Never enter the consumer's name.</p>
+          <p className="mt-1 text-sm text-slate-700">Journal format for this assessment type: <strong>{template.name}</strong></p>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <div className="border border-slate-200 p-4">
               <p className="font-semibold">Previous assessment</p>
@@ -253,7 +268,10 @@ export function StartAnnualAssessmentPage() {
       {step === 2 && (
         <div className="space-y-4">
           <Notice tone={prevText ? 'blue' : 'amber'} title={prevText ? 'Previous assessment retrieved' : 'No previous assessment'}>
-            {prevMeta?.label}. For each item choose <strong>Unchanged</strong> (confirmed still accurate), <strong>Changed</strong> (enter the update) or <strong>Clarify</strong>. Items you do not review are NOT carried forward — they appear as clarification markers in the draft.
+            {prevMeta?.label}. {prevText
+              ? <>Every item from the previous assessment is filled in and marked <strong>Unchanged</strong>. Go through the list and tap <strong>Changed</strong> for anything that is different, or <strong>Clarify</strong> if you are not sure. Visit items (date, people present, observations, next assessment) always need this visit's information.</>
+              : <>For each item choose <strong>Changed</strong> to enter the information, or <strong>Clarify</strong>.</>}
+            {' '}Format: <strong>{template.name}</strong>.
           </Notice>
           <div className="flex items-center justify-between text-sm text-slate-600">
             <span>{reviewed} of {template.fields.length} items reviewed</span>
@@ -296,6 +314,9 @@ export function StartAnnualAssessmentPage() {
                             {inp.status === 'changed' && (
                               <TextArea rows={2} value={inp.newText} placeholder="Updated information (without the label)" onChange={(e) => setField(f.id, { newText: e.target.value })} />
                             )}
+                            {inp.status === 'changed' && inp.fromPrevious && inp.newText.trim() === (prev?.text ?? '').trim() && (
+                              <p className="text-xs font-medium text-amber-800">Copied from the last visit — update it for this visit.</p>
+                            )}
                             {inp.status === 'clarify' && (
                               <Input value={inp.note} placeholder="What needs clarification?" onChange={(e) => setField(f.id, { note: e.target.value })} />
                             )}
@@ -309,7 +330,7 @@ export function StartAnnualAssessmentPage() {
             );
           })}
           <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white/90 p-3 backdrop-blur">
-            <Button variant="primary" onClick={generate}><FileCheck2 size={15} /> Prepare annual journal draft</Button>
+            <Button variant="primary" onClick={generate}><FileCheck2 size={15} /> Prepare journal draft</Button>
           </div>
         </div>
       )}

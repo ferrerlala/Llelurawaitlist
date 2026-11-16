@@ -23,6 +23,8 @@ export interface JournalFieldInput {
   newText: string;
   /** Note explaining what needs clarification. */
   note: string;
+  /** The text was pre-filled from the previous assessment and not yet edited. */
+  fromPrevious?: boolean;
 }
 
 export interface PreviousValue {
@@ -59,14 +61,50 @@ export function fieldLabels(field: JournalFieldDef): string[] {
 }
 
 /** Find the content of a template field in a journal/narrative text. */
-export function readJournalField(text: string, field: JournalFieldDef): string | null {
+/**
+ * Index of the line that holds a template field, or -1.
+ * - Formats with numbered sections ("1) Assessment Information") may repeat a label such as
+ *   "Additional Information" in several sections, so the line is looked for inside the field's own section.
+ * - Older notes sometimes leave out the colon ("Home Environment Clean and clear"), so a line that
+ *   starts with the label is accepted too.
+ */
+function findFieldLine(lines: string[], field: JournalFieldDef): { index: number; body: string } {
   const labels = fieldLabels(field);
-  for (const raw of text.split(/\r?\n/)) {
+  const groupKey = norm(stripMarker(field.group)).replace(/:$/, '');
+  const numbered = /^\s*\d+\)/.test(field.group);
+  const hasGroup = numbered && lines.some((raw) => /^\s*\d+\)/.test(raw) && norm(stripMarker(raw)).replace(/:$/, '').startsWith(groupKey.slice(0, 24)));
+  let inGroup = !hasGroup;
+  let loose: { index: number; body: string } | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    if (hasGroup && /^\s*\d+\)/.test(raw)) { inGroup = norm(stripMarker(raw)).replace(/:$/, '').startsWith(groupKey.slice(0, 24)); continue; }
+    if (!inGroup) continue;
     const line = stripMarker(raw);
     const { label, body } = splitLabel(line);
-    if (label && labels.includes(norm(label))) return body;
+    if (label && labels.includes(norm(label))) return { index: i, body: numbered ? withContinuation(lines, i, body) : body };
+    if (!loose) {
+      const n = norm(line);
+      const hit = labels.filter((l) => l.length >= 6).sort((a, b) => b.length - a.length).find((l) => n.startsWith(l) && /^[\s:.\-–]/.test(n.slice(l.length) || ' '));
+      if (hit) loose = { index: i, body: line.slice(hit.length).replace(/^[\s:.\-–]+/, '').trim() };
+    }
   }
-  return null;
+  return loose ? { index: loose.index, body: numbered ? withContinuation(lines, loose.index, loose.body) : loose.body } : { index: -1, body: '' };
+}
+
+/** In numbered formats an item can run onto the next line(s) without its own letter; keep those lines with the item. */
+function withContinuation(lines: string[], i: number, body: string): string {
+  const parts = [body];
+  for (let j = i + 1; j < lines.length; j++) {
+    const t = lines[j].trim();
+    if (!t || /^\s*(?:\(?(?:[a-z]|\d{1,2})[.)])\s/.test(lines[j]) || /^\s*\d+\)/.test(lines[j])) break;
+    parts.push(t);
+  }
+  return parts.join(' ').trim();
+}
+
+export function readJournalField(text: string, field: JournalFieldDef): string | null {
+  const { index, body } = findFieldLine(text.split(/\r?\n/), field);
+  return index >= 0 ? body : null;
 }
 
 /** Previous value for every template field, from the previous journal text. */
@@ -154,6 +192,10 @@ export function composeJournal(args: {
     } else if (input.status === 'clarify') {
       state = 'clarify';
       content = clarify(`${input.note || 'Case manager marked this for clarification'}${prev ? ` (previously: "${short(prev)}")` : ''}`);
+    } else if (newText && input.fromPrevious && prev && newText === prev.trim()) {
+      state = 'carried-flagged';
+      content = newText;
+      warnings.push('Copied from the previous visit — make sure it is right for this visit.');
     } else if (newText) {
       state = prev ? 'changed' : 'new';
       content = newText;
@@ -208,20 +250,21 @@ export function composeJournal(args: {
 export function setJournalField(text: string, template: JournalTemplate, fieldId: string, content: string): string {
   const fdef = template.fields.find((x) => x.id === fieldId);
   if (!fdef) throw new Error(`Unknown journal field ${fieldId}`);
-  const labels = fieldLabels(fdef);
   const lines = text.split(/\r?\n/);
-  const idx = lines.findIndex((raw) => {
-    const { label } = splitLabel(stripMarker(raw));
-    return !!label && labels.includes(norm(label));
-  });
+  const idx = findFieldLine(lines, fdef).index;
   const line = `${fdef.prefix}${fdef.label}: ${content.trim()}`;
-  if (idx >= 0) { lines[idx] = line; return lines.join('\n'); }
+  if (idx >= 0) {
+    let end = idx + 1;
+    if (/^\s*\d+\)/.test(fdef.group)) {
+      while (end < lines.length && lines[end].trim() && !/^\s*(?:\(?(?:[a-z]|\d{1,2})[.)])\s/.test(lines[end]) && !/^\s*\d+\)/.test(lines[end])) end++;
+    }
+    lines.splice(idx, end - idx, line);
+    return lines.join('\n');
+  }
   // Insert after the last present field of the same group, else after the previous field in template order.
   const order = template.fields.map((x) => x.id);
   for (let i = order.indexOf(fieldId) - 1; i >= 0; i--) {
-    const prevDef = template.fields[i];
-    const pLabels = fieldLabels(prevDef);
-    const at = lines.findIndex((raw) => { const { label } = splitLabel(stripMarker(raw)); return !!label && pLabels.includes(norm(label)); });
+    const at = findFieldLine(lines, template.fields[i]).index;
     if (at >= 0) { lines.splice(at + 1, 0, line); return lines.join('\n'); }
   }
   return `${text}\n${line}`;

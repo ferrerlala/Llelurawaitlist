@@ -80,4 +80,6 @@ export interface OrgSettings {
   functionalAreas: FunctionalAreaDef[];
   idleTimeoutMinutes: number;
   journalTemplate: JournalTemplate;
+  /** Journal format for six-month reassessments (defaults to the built-in format). */
+  sixMonthJournalTemplate?: JournalTemplate;
 }

@@ -5,6 +5,7 @@ import type { AppUser, AuditEntry, OrgSettings, ReviewRecord } from '../data/typ
 import type { AiProposal } from './ai-proposals.ts';
 import { applyFindingAction, matchCdsToJournal, type Analyzer, type CdsMatchSummary, type FindingAction } from './engine.ts';
 import { runIndependentQa } from './independent-qa.ts';
+import { journalTemplateFor } from '../config/journal-template.ts';
 
 export interface ApprovedItem { proposal: AiProposal; choice: number }
 
@@ -35,7 +36,7 @@ export async function applyProposals(
       if (!opt) continue;
       action = { ...action, optionId: opt.id };
     }
-    const res = await applyFindingAction(r, current, action, user, analyze, settings.journalTemplate);
+    const res = await applyFindingAction(r, current, action, user, analyze, journalTemplateFor(settings, r.input.assessmentType));
     r = res.review; entries.push(...res.audit); applied++;
   }
   onProgress?.('Filling the CDS from the final journal');

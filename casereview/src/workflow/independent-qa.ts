@@ -14,6 +14,7 @@ import type { AnalysisResult, QaResult, QaScoringConfig, QaStatus } from '../eng
 import { buildFindings } from './consistency.ts';
 import { finalApprovalValid, latestJournal } from './engine.ts';
 import type { ConsistencyFinding, FindingState } from './types.ts';
+import { journalTemplateFor } from '../config/journal-template.ts';
 
 export interface CategoryScore {
   categoryId: string;
@@ -98,7 +99,7 @@ export function runIndependentQa(review: ReviewRecord, settings: OrgSettings): I
   const analysis: AnalysisResult = { ...base, qa: qaAttested };
 
   // 2. Journal ↔ final CDS answers, re-derived independently.
-  const findings = buildFindings({ analysis, decisions: review.decisions, journalText, template: settings.journalTemplate, checklist, areas: settings.functionalAreas });
+  const findings = buildFindings({ analysis, decisions: review.decisions, journalText, template: journalTemplateFor(settings, review.input.assessmentType), checklist, areas: settings.functionalAreas });
   const open = findings.filter((f) => isOpen(f, states));
   const closed = Object.entries(states)
     .filter(([id, s]) => !open.some((f) => f.id === id) && s.status !== 'open')

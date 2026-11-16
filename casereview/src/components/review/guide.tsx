@@ -18,7 +18,7 @@ import { useBaselineScore } from './results-tab.tsx';
 import { FixIssuesTab, issueCategory, useIndependentQa } from './workflow-tabs.tsx';
 
 const NEXT: Record<CaseStep, CaseStep | null> = { assessment: 'journal', journal: 'cds', cds: 'corrections', corrections: 'qa', qa: 'final', final: null };
-const STEP_TITLE: Record<CaseStep, string> = { assessment: 'Assessment', journal: 'Annual Journal', cds: 'CDS Preparation', corrections: 'Corrections', qa: 'QA Review', final: 'Final Report' };
+const STEP_TITLE: Record<CaseStep, string> = { assessment: 'Assessment', journal: 'Journal', cds: 'CDS Preparation', corrections: 'Corrections', qa: 'QA Review', final: 'Final Report' };
 
 export function GuideView({ review, onAdvanced, initialStep }: { review: ReviewRecord; onAdvanced: () => void; initialStep?: CaseStep }) {
   const qa = useIndependentQa(review);
@@ -152,7 +152,7 @@ function JournalStep({ review, onDone }: { review: ReviewRecord; onDone: (m: str
 
   return (
     <div className="space-y-4">
-      <StepHeader n={2} title="Annual Journal" text={<>Your approved journal in the agency format. Sections with new information are marked <span className="bg-navy-50 px-1 text-navy-800">New</span>. Edit it here, or copy it into WellSky.</>}
+      <StepHeader n={2} title="Journal" text={<>Your approved journal in the agency format for this assessment type. Sections with new information are marked <span className="bg-navy-50 px-1 text-navy-800">New</span>. Edit it here, or copy it into WellSky.</>}
         actions={!editing && <><button type="button" onClick={() => { setText(v.text); setEditing(true); }} className="inline-flex items-center gap-1.5 border border-slate-300 bg-white px-4 py-3 text-sm font-medium hover:bg-slate-50"><Pencil size={14} /> Edit journal</button><CopyButton text={v.text} label="Copy journal" big /></>} />
       <p className="text-sm text-slate-600">Version {v.version} · approved by {v.approvedByName} on {new Date(v.approvedAt).toLocaleString()}</p>
       {editing ? (
@@ -378,7 +378,7 @@ function FinalStep({ review }: { review: ReviewRecord }) {
         </div>
       </section>
 
-      <Panel title="Approved annual journal" right={<CopyButton text={journal} label="Copy journal" />}>
+      <Panel title="Approved journal" right={<CopyButton text={journal} label="Copy journal" />}>
         <div className="divide-y divide-slate-100">
           {sections.map((sec, i) => (
             <div key={i} className="flex flex-wrap items-start gap-3 px-4 py-3">

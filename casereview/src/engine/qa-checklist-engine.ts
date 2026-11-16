@@ -156,6 +156,7 @@ const evaluators: Record<string, Evaluator> = {
   },
 
   financialConsent(ctx) {
+    if (ctx.input.assessmentType === 'Six-Month Reassessment') return { status: 'Not Applicable', evidenceFound: [], evidenceMissing: [], recommendedCorrection: 'The Financial Worksheet and Applicant Consent is reviewed at the Annual Redetermination, not at the six-month reassessment.' };
     const annual = ctx.input.assessmentType === 'Annual Redetermination';
     const ws = ctx.facts.get('financial.worksheet');
     const acd = ctx.facts.get('consent.applicant_consent');
@@ -181,6 +182,7 @@ const evaluators: Record<string, Evaluator> = {
   },
 
   copay(ctx) {
+    if (ctx.input.assessmentType === 'Six-Month Reassessment') return { status: 'Not Applicable', evidenceFound: [], evidenceMissing: [], recommendedCorrection: 'The copay is reviewed at the Annual Redetermination, not at the six-month reassessment.' };
     const copays = ctx.allFacts.get('financial.copay');
     const bySource = (t: DocumentType) => copays.filter((f) => f.location.docType === t);
     const narrative = bySource('Narrative / Journal Note');
@@ -221,6 +223,7 @@ const evaluators: Record<string, Evaluator> = {
   },
 
   mls(ctx) {
+    if (ctx.input.assessmentType === 'Six-Month Reassessment') return { status: 'Not Applicable', evidenceFound: [], evidenceMissing: [], recommendedCorrection: 'The MLS is reviewed at the Annual Redetermination, not at the six-month reassessment.' };
     const mls = ctx.facts.get('mls.status');
     const cdsMls = cdsEntries(ctx, /\bmls\b/i);
     const found = [...ev(mls), ...cdsEvidence(ctx, cdsMls)];
@@ -414,6 +417,7 @@ const evaluators: Record<string, Evaluator> = {
   },
 
   emergencyPermission(ctx) {
+    if (ctx.input.assessmentType === 'Six-Month Reassessment') return { status: 'Not Applicable', evidenceFound: [], evidenceMissing: [], recommendedCorrection: 'Permission to Contact Emergency Services is reviewed at the Annual Redetermination, not at the six-month reassessment.' };
     const p = ctx.facts.get('consent.emergency_services_permission');
     const acdDoc = hasDoc(ctx, 'Applicant Consent and Disclosure');
     const notes = ctx.allFacts.facts.some((f) => /a&d (details )?notes?/i.test(f.sourceText));
