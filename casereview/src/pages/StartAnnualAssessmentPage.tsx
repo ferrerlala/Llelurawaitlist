@@ -169,7 +169,7 @@ export function StartAnnualAssessmentPage() {
         supportingDocuments: supporting,
       });
       await persist({ ...review, workflow: { ...review.workflow!, aiAttested: attest } }, audit);
-      navigate(`/reviews/${review.id}?tab=guide&step=cds`);
+      navigate(`/reviews/${review.id}?tab=guide&step=journal`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -353,7 +353,7 @@ export function StartAnnualAssessmentPage() {
             <div className="flex justify-between">
               <Button variant="ghost" onClick={() => setStep(2)}><ArrowLeft size={14} /> Back to changes</Button>
               <Button variant="primary" disabled={busy || markers > 0} onClick={approve}>
-                {busy ? <><Loader2 size={15} className="animate-spin" /> Preparing CDS…</> : 'Approve journal & prepare CDS'}
+                {busy ? <><Loader2 size={15} className="animate-spin" /> Checking journal…</> : 'Save journal & review it'}
               </Button>
             </div>
             {markers > 0 && <p className="text-right text-xs text-red-700">Resolve every [[CLARIFY: …]] marker (enter the information, or delete the line content) before approval.</p>}

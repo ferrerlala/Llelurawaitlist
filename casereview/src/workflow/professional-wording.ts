@@ -17,6 +17,16 @@ const ABBREVIATIONS: [RegExp, string][] = [
   [/\bnot schedule\b/gi, 'not scheduled'], [/\bchanged-on\b/gi, 'changes in'],
 ];
 
+/** Common misspellings in case notes (whole words only). */
+export const SPELLING: [RegExp, string][] = [
+  [/\brecieve(d|s)?\b/gi, 'receive$1'], [/\boccured\b/gi, 'occurred'], [/\bseperate(ly)?\b/gi, 'separate$1'], [/\bindependant(ly)?\b/gi, 'independent$1'],
+  [/\balot\b/gi, 'a lot'], [/\bdefinately\b/gi, 'definitely'], [/\buntill\b/gi, 'until'], [/\bmedicaiton(s)?\b/gi, 'medication$1'], [/\bmedciation(s)?\b/gi, 'medication$1'],
+  [/\bassistence\b/gi, 'assistance'], [/\bambulatoin\b/gi, 'ambulation'], [/\bappointmnet(s)?\b/gi, 'appointment$1'], [/\bhospitilization(s)?\b/gi, 'hospitalization$1'],
+  [/\bhospitalisation(s)?\b/gi, 'hospitalization$1'], [/\bneighbour(s)?\b/gi, 'neighbor$1'], [/\bdiabeties\b/gi, 'diabetes'], [/\barthritus\b/gi, 'arthritis'],
+  [/\bwheel chair\b/gi, 'wheelchair'], [/\bshowe?r chair\b/gi, 'shower chair'], [/\bcarefull?y\b/gi, 'carefully'], [/\bteh\b/gi, 'the'], [/\bthier\b/gi, 'their'],
+  [/\bconsumers\b(?= (is|was|has|lives|reports|reported)\b)/gi, 'consumer'], [/\bschedual(ed)?\b/gi, 'schedule$1'], [/\bfollow up\b(?= (plan|appointment|visit|call))/gi, 'follow-up'],
+];
+
 const NONE = /^(none|n\/a|na|no)\.?$/i;
 const NUM: Record<string, string> = { '1': 'one', '2': 'two', '3': 'three', '4': 'four', '5': 'five' };
 
@@ -44,6 +54,7 @@ export function polishValue(fieldId: string, raw: string): string {
   let v = raw.replace(/\s+/g, ' ').trim();
   if (!v || /\[\[CLARIFY/.test(v)) return raw.trim();
   for (const [re, to] of ABBREVIATIONS) v = v.replace(re, to);
+  for (const [re, to] of SPELLING) v = v.replace(re, to);
 
   if (NONE.test(v) && !['memory_screening', 'emergency_contacts', 'assessment_date'].includes(fieldId)) {
     if (fieldId === 'hospitalizations') return 'Consumer reported no recent hospitalizations.';

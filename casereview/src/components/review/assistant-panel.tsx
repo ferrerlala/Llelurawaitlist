@@ -44,11 +44,12 @@ export function useProposals(review: ReviewRecord): AiProposal[] {
   }, [review, qa, settings]);
 }
 
-export function AssistantPanel({ review, onDone, embedded }: { review: ReviewRecord; onDone: (summary: string) => void; embedded?: boolean }) {
+export function AssistantPanel({ review, onDone, embedded, sections, fillCds = true, title }: { review: ReviewRecord; onDone: (summary: string) => void; embedded?: boolean; sections?: AiProposal['section'][]; fillCds?: boolean; title?: string }) {
   const { user, settings, persist } = useApp();
   const analyze = useAnalyzer(review);
-  const proposals = useProposals(review);
-  const gaps = cdsJournalGaps(review);
+  const allProposals = useProposals(review);
+  const proposals = sections ? allProposals.filter((p) => sections.includes(p.section)) : allProposals;
+  const gaps = sections && !sections.includes('CDS') ? { total: 0, unconfirmed: [], differs: [] } : cdsJournalGaps(review);
   const [open, setOpen] = useState(!!embedded);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -69,12 +70,12 @@ export function AssistantPanel({ review, onDone, embedded }: { review: ReviewRec
     if (!user) return;
     setBusy(true); setError('');
     try {
-      const res = await applyProposals(review, approved.map((p) => ({ proposal: p, choice: choiceOf(p) })), user, analyze, settings, (t) => setProgress(t));
+      const res = await applyProposals(review, approved.map((p) => ({ proposal: p, choice: choiceOf(p) })), user, analyze, settings, (t) => setProgress(t), { fillCds });
       setProgress('Saving');
       await persist(res.review, res.audit);
       setPick({}); setOn({}); setExpanded({});
       if (!embedded) setOpen(false);
-      onDone(`${res.applied} fix(es) approved.${res.cds.confirmed + res.cds.updated ? ` ${res.cds.confirmed + res.cds.updated} CDS answer(s) were filled from the final journal.` : ''} The CDS matches the journal.`);
+      onDone(`${res.applied} item(s) approved.${res.cds.confirmed + res.cds.updated ? ` ${res.cds.confirmed + res.cds.updated} CDS answer(s) were filled from the journal.` : ''}`);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); setProgress(''); }
   }
 
@@ -115,7 +116,7 @@ export function AssistantPanel({ review, onDone, embedded }: { review: ReviewRec
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 p-5">
         <Sparkles className="text-navy-700" size={24} aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-semibold">The assistant fixed {proposals.length} item(s)</h2>
+          <h2 className="text-xl font-semibold">{title ?? `The assistant fixed ${proposals.length} item(s)`}</h2>
           <p className="text-sm text-slate-600">Look them over. Tap <b>Change</b> if something is wrong. Then press <b>Approve</b> at the bottom.</p>
         </div>
         {!embedded && <button type="button" onClick={() => setOpen(false)} className="font-mono text-xs text-slate-600 underline">Close</button>}
@@ -203,7 +204,7 @@ export function AssistantPanel({ review, onDone, embedded }: { review: ReviewRec
           {busy ? 'Working…' : `Approve ${approved.length} fix(es)`}
         </button>
         {busy ? <span className="flex items-center gap-2 text-sm text-slate-600"><Loader2 size={15} className="animate-spin" /> {progress}</span>
-          : <span className="text-sm text-slate-600">Unticked items are skipped. After the fixes, CDS answers that come straight from the journal are confirmed. Answers you already confirmed are not changed.</span>}
+          : <span className="text-sm text-slate-600">Unticked items are skipped.{fillCds ? ' After the fixes, CDS answers that come straight from the journal are confirmed. Answers you already confirmed are not changed.' : ''}</span>}
         {error && <p className="w-full text-sm text-red-700">{error}</p>}
       </div>
     </section>

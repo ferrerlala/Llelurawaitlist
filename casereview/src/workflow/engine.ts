@@ -287,3 +287,25 @@ export function finalApprovalValid(review: ReviewRecord): boolean {
 export function decisionsSignature(review: ReviewRecord): string {
   return Object.entries(review.decisions).sort(([a], [b]) => a.localeCompare(b)).map(([k, d]) => `${k}=${d.status}:${d.value}`).join('|');
 }
+
+/** Approve the current journal as final and lock that version as the source for the CDs report. */
+export function lockJournal(review: ReviewRecord, user: AppUser) {
+  const v = latestJournal(review)!;
+  return {
+    review: { ...review, workflow: { ...review.workflow!, journalLock: { version: v.version, at: new Date().toISOString(), by: user.id, byName: user.name } } },
+    audit: [audit(user, review.id, 'journal.locked', 'journal', `v${v.version}`, null, `Journal v${v.version} approved as final and locked for the CDs report`)],
+  };
+}
+
+/** True while the locked journal is still the latest version. */
+export function journalLocked(review: ReviewRecord): boolean {
+  const lock = review.workflow?.journalLock;
+  return !!lock && lock.version === latestJournal(review)?.version;
+}
+
+/** Record the assistant's approved wording/spelling/format corrections. */
+export function recordAiCorrections(review: ReviewRecord, user: AppUser, items: { field: string; before: string; after: string }[]): ReviewRecord {
+  const wf = review.workflow!;
+  const entry = { at: new Date().toISOString(), byName: user.name, version: latestJournal(review)!.version, items };
+  return { ...review, workflow: { ...wf, aiCorrections: [...(wf.aiCorrections ?? []), entry] } };
+}

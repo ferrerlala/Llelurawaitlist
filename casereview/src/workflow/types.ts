@@ -107,6 +107,10 @@ export interface WorkflowState {
   attestations: Record<string, Attestation>;
   finalApproval: FinalApproval | null;
   lastRerun: RerunImpact | null;
+  /** The journal version the case manager approved as final; the CDs report is generated from it. */
+  journalLock?: { version: number; at: string; by: string; byName: string };
+  /** Corrections the assistant made and the case manager approved (wording, spelling, format). */
+  aiCorrections?: { at: string; byName: string; version: number; items: { field: string; before: string; after: string }[] }[];
   /** Last time the CDS was filled from the final journal. */
   cdsMatch?: { journalVersion: number; at: string; confirmed: number; updated: number; needPick: number };
 }

@@ -12,6 +12,7 @@ export interface ApprovedItem { proposal: AiProposal; choice: number }
 export async function applyProposals(
   review: ReviewRecord, items: ApprovedItem[], user: AppUser, analyze: Analyzer, settings: OrgSettings,
   onProgress?: (text: string) => void,
+  opts: { fillCds?: boolean } = {},
 ): Promise<{ review: ReviewRecord; audit: AuditEntry[]; applied: number; cds: CdsMatchSummary }> {
   let r = review;
   const entries: AuditEntry[] = [];
@@ -39,6 +40,7 @@ export async function applyProposals(
     const res = await applyFindingAction(r, current, action, user, analyze, journalTemplateFor(settings, r.input.assessmentType));
     r = res.review; entries.push(...res.audit); applied++;
   }
+  if (opts.fillCds === false) return { review: r, audit: entries, applied, cds: { journalVersion: 0, at: new Date().toISOString(), confirmed: 0, updated: 0, needPick: 0 } };
   onProgress?.('Filling the CDS from the final journal');
   const m = matchCdsToJournal(r, user, { updateConfirmed: false });
   return { review: m.review, audit: [...entries, ...m.audit], applied, cds: m.summary };

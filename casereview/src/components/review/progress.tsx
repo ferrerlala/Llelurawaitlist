@@ -5,18 +5,16 @@ import { Check } from 'lucide-react';
 
 export type CaseStep = 'assessment' | 'journal' | 'cds' | 'corrections' | 'qa' | 'final';
 export const CASE_STEPS: { id: CaseStep; label: string }[] = [
-  { id: 'assessment', label: 'Assessment' },
-  { id: 'journal', label: 'Journal' },
-  { id: 'cds', label: 'CDS' },
-  { id: 'corrections', label: 'Corrections' },
-  { id: 'qa', label: 'QA' },
-  { id: 'final', label: 'Final Report' },
+  { id: 'assessment', label: 'Start' },
+  { id: 'journal', label: 'Journal Review' },
+  { id: 'cds', label: 'CDs Report' },
+  { id: 'qa', label: 'Final QA Validation' },
 ];
 
 export function CaseProgress({ active, complete, onSelect }: { active: CaseStep; complete: Partial<Record<CaseStep, boolean>>; onSelect?: (s: CaseStep) => void }) {
   return (
     <nav aria-label="Case progress" className="no-print">
-      <ol className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+      <ol className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
         {CASE_STEPS.map((s, i) => {
           const isActive = s.id === active;
           const done = !!complete[s.id];
