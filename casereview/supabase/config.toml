@@ -1,0 +1,6 @@
+# Minimal Supabase CLI configuration. Run `supabase init` to generate a full file if needed.
+project_id = "casereview-qa"
+
+[functions.analyze-assessment]
+verify_jwt = true
+import_map = "./functions/analyze-assessment/deno.json"

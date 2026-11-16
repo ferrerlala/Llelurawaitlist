@@ -1,0 +1,377 @@
+import clsx from 'clsx';
+import { ArrowLeft, CheckCircle2, ClipboardPaste, FileCheck2, FileUp, Loader2, Sparkles, Trash2 } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { DOCUMENT_TYPES, type DocumentType, type SourceDocument } from '@shared/extraction-contract.ts';
+import { newId } from '../data/repository.ts';
+import { ACCEPTED_FILE_TYPES, extractTextFromFile } from '../lib/document-text.ts';
+import { CaseProgress } from '../components/review/progress.tsx';
+import { CopyButton } from '../components/review/copy.tsx';
+import { WordingPanel } from '../components/review/wording-panel.tsx';
+import { useNavigate } from 'react-router-dom';
+import { useApp } from '../app/AppContext.tsx';
+import { useAnalyzer } from '../app/use-analyzer.ts';
+import { Badge, Button, Card, Input, Label, Notice, PageHeader, Select, TextArea } from '../components/ui.tsx';
+import { JOURNAL_SECTIONS, journalTemplateFor } from '../config/journal-template.ts';
+import { SAMPLE_ANNUAL_CHANGES, SAMPLE_PREVIOUS_JOURNAL } from '../config/sample-data.ts';
+import { ASSESSMENT_TYPES, type AssessmentType } from '../engine/types.ts';
+import { approveJournal, latestJournal } from '../workflow/engine.ts';
+import { CLARIFY_RE, composeJournal, journalProblems, previousValues, type FieldReviewStatus, type JournalDraft, type JournalFieldInput } from '../workflow/journal-builder.ts';
+import type { ReviewRecord } from '../data/types.ts';
+
+const STATE_TONE: Record<string, 'green' | 'amber' | 'red' | 'blue' | 'slate' | 'purple'> = {
+  new: 'blue', changed: 'blue', confirmed: 'green', 'carried-flagged': 'amber', clarify: 'red', omitted: 'slate', auto: 'green',
+};
+const STATE_LABEL: Record<string, string> = {
+  new: 'New', changed: 'Changed', confirmed: 'Unchanged – confirmed', 'carried-flagged': 'Carried forward – check', clarify: 'Needs clarification', omitted: 'Omitted (optional)', auto: 'Filled automatically',
+};
+
+function guessSupportingType(name: string): DocumentType {
+  const n = name.toLowerCase();
+  if (/cds/.test(n)) return 'CDS Record';
+  if (/risk/.test(n)) return 'Risk Worksheet';
+  if (/financial|worksheet/.test(n)) return 'Financial Worksheet';
+  if (/consent|disclosure/.test(n)) return 'Applicant Consent and Disclosure';
+  if (/suspen/.test(n)) return 'Service Suspension Record';
+  return 'Other Supporting Document';
+}
+
+function previousJournalText(r: ReviewRecord): string {
+  return latestJournal(r)?.text ?? r.input.documents.filter((d) => d.type === 'Narrative / Journal Note').map((d) => d.text).join('\n') ?? '';
+}
+
+export function StartAnnualAssessmentPage() {
+  const { user, settings, reviews, persist } = useApp();
+  const navigate = useNavigate();
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [caseId, setCaseId] = useState('');
+  const [assessmentDate, setAssessmentDate] = useState('');
+  const [assessmentType, setAssessmentType] = useState<AssessmentType>('Annual Redetermination');
+  const [program, setProgram] = useState('');
+  // The journal format follows the assessment type: six-month reassessments use the shorter format.
+  const template = journalTemplateFor(settings, assessmentType);
+  const [prevText, setPrevText] = useState<string | null>(null);
+  const [prevMeta, setPrevMeta] = useState<{ id: string | null; date: string | null; label: string } | null>(null);
+  const [inputs, setInputs] = useState<Record<string, JournalFieldInput>>({});
+  const [draft, setDraft] = useState<JournalDraft | null>(null);
+  const [journalText, setJournalText] = useState('');
+  const [attest, setAttest] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const analyze = useAnalyzer(null, attest);
+  const [uploadedPrev, setUploadedPrev] = useState<string | null>(null);
+  const [supporting, setSupporting] = useState<SourceDocument[]>([]);
+  const [uploadMsg, setUploadMsg] = useState('');
+  const [pasting, setPasting] = useState(false);
+  const [pasted, setPasted] = useState('');
+  const usePasted = () => {
+    if (!pasted.trim()) return;
+    setPrevText(pasted);
+    setUploadedPrev('Pasted text');
+    setPrevMeta({ id: null, date: null, label: 'Previous assessment pasted by the case manager' });
+    setPasting(false);
+  };
+  const prevRef = useRef<HTMLInputElement>(null);
+  const docsRef = useRef<HTMLInputElement>(null);
+
+  const onPrevFile = async (files: FileList | null) => {
+    const f = files?.[0];
+    if (!f) return;
+    setUploadMsg('');
+    try {
+      const text = await extractTextFromFile(f);
+      setPrevText(text);
+      setUploadedPrev(f.name);
+      setPrevMeta({ id: null, date: null, label: `Uploaded previous assessment: ${f.name}` });
+    } catch (e) { setUploadMsg((e as Error).message); }
+    if (prevRef.current) prevRef.current.value = '';
+  };
+  const onSupportingFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploadMsg('');
+    const added: SourceDocument[] = [];
+    const errors: string[] = [];
+    for (const f of Array.from(files)) {
+      try { added.push({ id: newId('doc'), name: f.name, type: guessSupportingType(f.name), text: await extractTextFromFile(f) }); }
+      catch (e) { errors.push((e as Error).message); }
+    }
+    setSupporting((d) => [...d, ...added]);
+    if (errors.length) setUploadMsg(errors.join(' '));
+    if (docsRef.current) docsRef.current.value = '';
+  };
+
+  const caseIds = useMemo(() => [...new Set(reviews.map((r) => r.input.caseIdentifier))].sort(), [reviews]);
+  const previous = useMemo(() => previousValues(template, prevText), [template, prevText]);
+
+  /** Pre-fill every item that has previous text as "Unchanged" so the case manager only changes what is different. */
+  const prefillFrom = (text: string | null) => {
+    const prevVals = previousValues(template, text);
+    setInputs(Object.fromEntries(template.fields.filter((f) => f.id !== 'assessment_date' && prevVals[f.id]?.text).map((f) => {
+      // Visit items (people present, observations, dates) are copied as text for the case manager to update.
+      const visit = f.unchanged === 'clarify' || f.unchanged === 'never';
+      return [f.id, visit
+        ? { fieldId: f.id, status: 'changed' as FieldReviewStatus, newText: prevVals[f.id].text!.trim(), note: '', fromPrevious: true }
+        : { fieldId: f.id, status: 'unchanged' as FieldReviewStatus, newText: '', note: '' }];
+    })));
+  };
+
+  const retrieve = () => {
+    setError('');
+    if (uploadedPrev && prevText) { prefillFrom(prevText); setStep(2); return; }
+    const prior = reviews
+      .filter((r) => r.input.caseIdentifier === caseId.trim() && (!assessmentDate || !r.input.assessmentDate || r.input.assessmentDate < assessmentDate))
+      .sort((a, b) => (b.input.assessmentDate || b.createdAt).localeCompare(a.input.assessmentDate || a.createdAt))[0];
+    if (prior) {
+      setPrevText(previousJournalText(prior));
+      prefillFrom(previousJournalText(prior));
+      setPrevMeta({ id: prior.id, date: prior.input.assessmentDate || null, label: `${prior.input.assessmentType} ${prior.input.assessmentDate || ''} (${prior.workflow ? `journal v${latestJournal(prior)?.version}` : 'narrative review'})` });
+      if (!program) setProgram(prior.input.program);
+    } else {
+      setPrevText(null);
+      setPrevMeta({ id: null, date: null, label: 'No previous assessment on file for this case in this application' });
+      setInputs({});
+    }
+    setStep(2);
+  };
+
+  const loadExample = () => {
+    setCaseId('DEMO-0002');
+    setAssessmentDate('2026-11-12');
+    setAssessmentType('Annual Redetermination');
+    setProgram('HCB-NW');
+    setPrevText(SAMPLE_PREVIOUS_JOURNAL);
+    setPrevMeta({ id: null, date: '2025-11-06', label: 'Fictional example: Annual Redetermination 11/6/2025' });
+    setInputs(Object.fromEntries(Object.entries(SAMPLE_ANNUAL_CHANGES).map(([id, [status, text]]) => [id, { fieldId: id, status, newText: text, note: '' }])));
+    setStep(2);
+  };
+
+  const setField = (fieldId: string, patch: Partial<JournalFieldInput>) =>
+    setInputs((s) => ({ ...s, [fieldId]: { ...{ fieldId, status: 'not_reviewed' as FieldReviewStatus, newText: '', note: '' }, ...s[fieldId], ...patch } }));
+
+  const generate = () => {
+    const d = composeJournal({ template, assessmentDate, previous, inputs });
+    setDraft(d);
+    setJournalText(d.text);
+    setStep(3);
+  };
+
+  const problems = journalProblems(journalText);
+  const markers = (journalText.match(CLARIFY_RE) ?? []).length;
+
+  const approve = async () => {
+    if (!user || !draft) return;
+    if (settings.aiMode === 'claude' && !attest) { setError('Confirm the journal contains only fictional or de-identified test data before using an external AI provider.'); return; }
+    setBusy(true);
+    setError('');
+    try {
+      const { review, audit } = await approveJournal({
+        user, analyze, caseIdentifier: caseId.trim(), assessmentType, assessmentDate, program, journalText, inputs, draftFields: draft.fields, template,
+        previousReviewId: prevMeta?.id ?? null, previousAssessmentDate: prevMeta?.date ?? null,
+        supportingDocuments: supporting,
+      });
+      await persist({ ...review, workflow: { ...review.workflow!, aiAttested: attest } }, audit);
+      navigate(`/reviews/${review.id}?tab=guide&step=cds`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reviewed = template.fields.filter((f) => inputs[f.id] && inputs[f.id].status !== 'not_reviewed').length;
+
+  return (
+    <>
+      <PageHeader
+        title="Start Assessment"
+        description="Annual or 6-month: previous assessment + what changed → journal in the right format → your approval → CDS, checks and QA."
+        actions={step === 1 && <Button onClick={loadExample}><Sparkles size={15} /> Load fictional example (Nov 12, 2026)</Button>}
+      />
+      <div className="mb-4"><CaseProgress active={step === 3 ? 'journal' : 'assessment'} complete={{ assessment: step === 3 }} /></div>
+      <ol className="mb-5 grid gap-2 sm:grid-cols-3">
+        {['Start assessment', 'Update information', 'Generate journal'].map((label, i) => (
+          <li key={label} className={clsx('border px-3 py-2 text-sm', step === i + 1 ? 'border-slate-900 bg-white font-semibold' : step > i + 1 ? 'border-emerald-200 bg-white text-emerald-800' : 'border-slate-200 bg-white text-slate-500')}>
+            <span className="mr-1.5 text-xs text-slate-500">Part {i + 1}</span>{label}{step > i + 1 && ' ✓'}
+          </li>
+        ))}
+      </ol>
+
+      {step === 1 && (
+        <Card title="Case and assessment">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div>
+              <Label htmlFor="cid">Internal case ID</Label>
+              <Input id="cid" list="case-ids" value={caseId} onChange={(e) => setCaseId(e.target.value)} placeholder="e.g. DEMO-0002" />
+              <datalist id="case-ids">{caseIds.map((c) => <option key={c} value={c} />)}</datalist>
+            </div>
+            <div><Label htmlFor="ad">Assessment date</Label><Input id="ad" type="date" value={assessmentDate} onChange={(e) => setAssessmentDate(e.target.value)} /></div>
+            <div><Label htmlFor="at">Assessment type</Label><Select id="at" value={assessmentType} onChange={(e) => setAssessmentType(e.target.value as AssessmentType)}>{ASSESSMENT_TYPES.map((t) => <option key={t}>{t}</option>)}</Select></div>
+            <div><Label htmlFor="pg">Program</Label><Input id="pg" value={program} onChange={(e) => setProgram(e.target.value)} /></div>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">Use the internal case ID only. Never enter the consumer's name.</p>
+          <p className="mt-1 text-sm text-slate-700">Journal format for this assessment type: <strong>{template.name}</strong></p>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="border border-slate-200 p-4">
+              <p className="font-semibold">Previous assessment</p>
+              <p className="mt-1 text-sm text-slate-600">If this case is already in the app, the last assessment is found automatically. Or upload it (PDF, Word or text), or copy and paste it.</p>
+              <input ref={prevRef} type="file" accept={ACCEPTED_FILE_TYPES} className="hidden" onChange={(e) => onPrevFile(e.target.files)} />
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button onClick={() => prevRef.current?.click()}><FileUp size={15} /> Upload previous assessment</Button>
+                <Button onClick={() => { setPasting(true); setPasted(uploadedPrev === 'Pasted text' ? prevText ?? '' : ''); }}><ClipboardPaste size={15} /> Paste text</Button>
+                {uploadedPrev && <Button variant="ghost" onClick={() => { setUploadedPrev(null); setPrevText(null); setPrevMeta(null); setPasted(''); }}><Trash2 size={14} /> Remove</Button>}
+              </div>
+              {pasting && (
+                <div className="mt-3 space-y-2">
+                  <Label htmlFor="paste-prev">Paste the previous assessment or journal</Label>
+                  <TextArea id="paste-prev" rows={10} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="Paste here. Remove the consumer's name and other identifying details first." />
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="primary" disabled={!pasted.trim()} onClick={usePasted}>Use this text</Button>
+                    <Button variant="ghost" onClick={() => setPasting(false)}>Cancel</Button>
+                  </div>
+                </div>
+              )}
+              {uploadedPrev && prevText && (() => {
+                const found = template.fields.filter((f) => previous[f.id]?.text);
+                return (
+                  <div className="mt-3 bg-slate-50 p-3 text-sm">
+                    <p><b>{uploadedPrev}</b> — found {found.length} of {template.fields.length} journal items.</p>
+                    <p className="mt-1 text-xs text-slate-600">{found.slice(0, 12).map((f) => f.label).join(' · ')}{found.length > 12 ? ' …' : ''}</p>
+                    <p className="mt-1 text-xs text-slate-600">You will review every item in the next part.</p>
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="border border-slate-200 p-4">
+              <p className="font-semibold">Supporting documents <span className="font-normal text-slate-500">(optional)</span></p>
+              <p className="mt-1 text-sm text-slate-600">Financial worksheet, consent forms, risk worksheet, CDS record. They are used in the checks.</p>
+              <input ref={docsRef} type="file" multiple accept={ACCEPTED_FILE_TYPES} className="hidden" onChange={(e) => onSupportingFiles(e.target.files)} />
+              <div className="mt-3"><Button onClick={() => docsRef.current?.click()}><FileUp size={15} /> Upload documents</Button></div>
+              {supporting.length > 0 && (
+                <ul className="mt-3 space-y-2 text-sm">
+                  {supporting.map((d) => (
+                    <li key={d.id} className="flex flex-wrap items-center gap-2 bg-slate-50 p-2">
+                      <span className="min-w-0 flex-1 truncate font-medium">{d.name}</span>
+                      <Select aria-label={`Document type for ${d.name}`} value={d.type} onChange={(e) => setSupporting((x) => x.map((y) => (y.id === d.id ? { ...y, type: e.target.value as DocumentType } : y)))} className="!w-auto">
+                        {DOCUMENT_TYPES.filter((t) => t !== 'Narrative / Journal Note').map((t) => <option key={t}>{t}</option>)}
+                      </Select>
+                      <button type="button" aria-label={`Remove ${d.name}`} onClick={() => setSupporting((x) => x.filter((y) => y.id !== d.id))} className="p-1 text-slate-500 hover:text-red-700"><Trash2 size={15} /></button>
+                      <span className="w-full text-xs text-slate-500">{d.text.trim().split(/\s+/).length} words extracted</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          {uploadMsg && <Notice tone="red" className="mt-3">{uploadMsg}</Notice>}
+          <div className="mt-4 flex justify-end"><Button variant="primary" disabled={!caseId.trim() || !assessmentDate} onClick={retrieve}>Continue: update information</Button></div>
+        </Card>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-4">
+          <Notice tone={prevText ? 'blue' : 'amber'} title={prevText ? 'Previous assessment retrieved' : 'No previous assessment'}>
+            {prevMeta?.label}. {prevText
+              ? <>Every item from the previous assessment is filled in and marked <strong>Unchanged</strong>. Go through the list and tap <strong>Changed</strong> for anything that is different, or <strong>Clarify</strong> if you are not sure. Visit items (date, people present, observations, next assessment) always need this visit's information.</>
+              : <>For each item choose <strong>Changed</strong> to enter the information, or <strong>Clarify</strong>.</>}
+            {' '}Format: <strong>{template.name}</strong>.
+          </Notice>
+          <div className="flex items-center justify-between text-sm text-slate-600">
+            <span>{reviewed} of {template.fields.length} items reviewed</span>
+            <Button variant="ghost" onClick={() => setStep(1)}><ArrowLeft size={14} /> Back</Button>
+          </div>
+          {JOURNAL_SECTIONS.map((section, si) => {
+            const fields = template.fields.filter((f) => f.section === section);
+            if (!fields.length) return null;
+            return (
+              <Card key={section} title={`${si + 1}. ${section}`}
+                actions={fields.some((f) => previous[f.id]?.text) && (
+                  <Button size="sm" variant="ghost" onClick={() => fields.forEach((f) => previous[f.id]?.text && !inputs[f.id]?.newText && setField(f.id, { status: 'unchanged' }))}><CheckCircle2 size={13} /> Confirm section unchanged</Button>
+                )}>
+                <div className="space-y-4">
+                  {fields.map((f) => {
+                    const prev = previous[f.id];
+                    const inp = inputs[f.id] ?? { status: 'not_reviewed' as FieldReviewStatus, newText: '', note: '' };
+                    return (
+                      <div key={f.id} className="grid gap-3 border-b border-slate-100 pb-3 last:border-0 md:grid-cols-[1fr_1fr]">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">{f.prefix}{f.label}{!f.required && <span className="ml-1 text-xs font-normal text-slate-400">(optional)</span>}</p>
+                          {f.hint && <p className="text-xs text-slate-500">{f.hint}</p>}
+                          <p className="mt-1 rounded bg-slate-50 p-2 text-xs text-slate-700">
+                            {f.id === 'assessment_date' ? `Filled from the assessment date (${assessmentDate || 'not set'})` : prev?.text ?? <span className="italic text-slate-400">Not in the previous assessment</span>}
+                            {prev?.source === 'facts' && <Badge tone="purple" className="ml-1">recovered from narrative</Badge>}
+                          </p>
+                        </div>
+                        {f.id === 'assessment_date' ? <div className="text-xs text-slate-500">Automatic</div> : (
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap gap-1">
+                              {(['unchanged', 'changed', 'clarify'] as FieldReviewStatus[]).map((st) => (
+                                <button key={st} type="button" disabled={st === 'unchanged' && !prev?.text}
+                                  onClick={() => setField(f.id, { status: st })}
+                                  className={clsx('rounded px-2 py-1 text-xs font-medium ring-1 disabled:opacity-40', inp.status === st ? 'bg-navy-800 text-white ring-navy-800' : 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50')}>
+                                  {st === 'unchanged' ? 'Unchanged' : st === 'changed' ? (prev?.text ? 'Changed' : 'Enter') : 'Clarify'}
+                                </button>
+                              ))}
+                              {inp.status === 'not_reviewed' && <Badge tone="slate">not reviewed</Badge>}
+                            </div>
+                            {inp.status === 'changed' && (
+                              <TextArea rows={2} value={inp.newText} placeholder="Updated information (without the label)" onChange={(e) => setField(f.id, { newText: e.target.value })} />
+                            )}
+                            {inp.status === 'changed' && inp.fromPrevious && inp.newText.trim() === (prev?.text ?? '').trim() && (
+                              <p className="text-xs font-medium text-amber-800">Copied from the last visit — update it for this visit.</p>
+                            )}
+                            {inp.status === 'clarify' && (
+                              <Input value={inp.note} placeholder="What needs clarification?" onChange={(e) => setField(f.id, { note: e.target.value })} />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            );
+          })}
+          <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white/90 p-3 backdrop-blur">
+            <Button variant="primary" onClick={generate}><FileCheck2 size={15} /> Prepare journal draft</Button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && draft && (
+        <div className="grid gap-5 xl:grid-cols-[3fr_2fr]">
+          <div className="space-y-3">
+            <Notice tone="blue" title="Your journal draft">
+              Each line is your entry, a previous line you confirmed, or a marker to fill in. Nothing new is made up. Improve the wording, edit anything, then approve.
+            </Notice>
+            <WordingPanel text={journalText} template={template} onApply={(t) => setJournalText(t)} />
+            <div className="flex flex-wrap items-center justify-between gap-2"><p className="min-w-0 flex-1 basis-56 text-sm text-slate-600">Edit the journal below. When it reads well, press <b>Approve journal &amp; prepare CDS</b> — the CDS is filled from it.</p><CopyButton text={journalText} label="Copy journal" /></div>
+            <TextArea rows={40} className="font-mono text-[12.5px] leading-relaxed" value={journalText} onChange={(e) => setJournalText(e.target.value)} aria-label="Annual journal" />
+            {problems.map((p) => <Notice key={p} tone={/CLARIFY|clarification/.test(p) ? 'red' : 'amber'}>{p}</Notice>)}
+            {settings.aiMode === 'claude' && (
+              <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={attest} onChange={(e) => setAttest(e.target.checked)} className="mt-1" /> This journal contains only fictional or de-identified test data.</label>
+            )}
+            {error && <Notice tone="red">{error}</Notice>}
+            <div className="flex justify-between">
+              <Button variant="ghost" onClick={() => setStep(2)}><ArrowLeft size={14} /> Back to changes</Button>
+              <Button variant="primary" disabled={busy || markers > 0} onClick={approve}>
+                {busy ? <><Loader2 size={15} className="animate-spin" /> Preparing CDS…</> : 'Approve journal & prepare CDS'}
+              </Button>
+            </div>
+            {markers > 0 && <p className="text-right text-xs text-red-700">Resolve every [[CLARIFY: …]] marker (enter the information, or delete the line content) before approval.</p>}
+          </div>
+          <Card title="Changes from the previous assessment" subtitle={`${draft.fields.filter((f) => f.state === 'changed' || f.state === 'new').length} changed/new · ${draft.fields.filter((f) => f.state === 'carried-flagged').length} carried forward to check · ${draft.clarifyCount} to clarify`}>
+            <ul className="max-h-[70rem] space-y-2 overflow-y-auto">
+              {draft.fields.filter((f) => f.state !== 'omitted').map((f) => (
+                <li key={f.fieldId} className={clsx('rounded-md border p-2 text-xs', f.state === 'clarify' ? 'border-red-200 bg-red-50/50' : f.state === 'changed' || f.state === 'new' ? 'border-navy-200 bg-navy-50/40' : f.state === 'carried-flagged' ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200')}>
+                  <div className="flex items-center justify-between gap-2"><span className="font-semibold text-slate-800">{f.label}</span><Badge tone={STATE_TONE[f.state]}>{STATE_LABEL[f.state]}</Badge></div>
+                  {f.changes.map((c) => <p key={c} className="mt-0.5 text-navy-800">• {c}</p>)}
+                  {f.warnings.map((w) => <p key={w} className="mt-0.5 text-amber-800">⚠ {w}</p>)}
+                  {f.state === 'changed' && f.previous && <p className="mt-0.5 text-slate-400 line-through">{f.previous.slice(0, 220)}</p>}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </div>
+      )}
+    </>
+  );
+}

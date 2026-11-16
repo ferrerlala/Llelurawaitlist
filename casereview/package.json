@@ -1,0 +1,42 @@
+{
+  "name": "casereview-qa",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "AI-assisted case management documentation, CDS preparation and QA review assistant (MVP).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:db": "bash scripts/test-rls.sh",
+    "build:hosted": "VITE_HOSTED=true vite build --base ./ --outDir dist-hosted"
+  },
+  "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
+    "@supabase/supabase-js": "^2.119.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.72.0",
+    "mammoth": "^1.13.0",
+    "pdfjs-dist": "^5.4.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.18.5"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "~5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^4.0.0"
+  }
+}
